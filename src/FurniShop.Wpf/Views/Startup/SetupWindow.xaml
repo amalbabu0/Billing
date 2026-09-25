@@ -1,0 +1,42 @@
+<Window x:Class="FurniShop.Wpf.Views.Startup.SetupWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="FurniShop — First-time setup" Width="560" SizeToContent="Height" WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize" Background="{StaticResource AppBackground}" FontFamily="Segoe UI">
+    <Border Style="{StaticResource Card}" Margin="20" Padding="26">
+        <StackPanel>
+            <TextBlock Text="Welcome to FurniShop" Style="{StaticResource PageTitle}"/>
+            <TextBlock Style="{StaticResource PageSubtitle}" Margin="0,4,0,20"
+                       Text="The database is ready. Create the owner (administrator) account. You can add staff accounts later under Employees → Users."/>
+            <TextBlock Text="Owner's full name" Style="{StaticResource Label}"/>
+            <TextBox x:Name="NameBox" Margin="0,0,0,12" Text="Shop Owner"/>
+            <TextBlock Text="Username" Style="{StaticResource Label}"/>
+            <TextBox x:Name="UserBox" Margin="0,0,0,12" Text="admin"/>
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="Password" Style="{StaticResource Label}"/>
+                    <PasswordBox x:Name="PasswordBox"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                    <TextBlock Text="Confirm password" Style="{StaticResource Label}"/>
+                    <PasswordBox x:Name="ConfirmBox"/>
+                </StackPanel>
+            </Grid>
+            <TextBlock Style="{StaticResource Muted}" Margin="0,6,0,0" Text="At least 8 characters with letters and numbers."/>
+            <Border Style="{StaticResource SoftPanel}" Margin="0,18,0,0">
+                <StackPanel>
+                    <CheckBox x:Name="DemoCheck" Content="Load demo data (sample products, customers, invoices, orders and deliveries)" IsChecked="True"/>
+                    <TextBlock Style="{StaticResource Muted}" Margin="22,2,0,0"
+                               Text="Recommended for training. For a live shop start empty, or delete this database later and start again."/>
+                </StackPanel>
+            </Border>
+            <TextBlock x:Name="ErrorText" Style="{StaticResource FieldError}"/>
+            <TextBlock x:Name="ProgressText" Style="{StaticResource Muted}" Margin="0,10,0,0"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+                <Button Content="Exit" Click="Exit_Click" Margin="0,0,8,0" MinWidth="90"/>
+                <Button x:Name="CreateButton" Content="Create account" Style="{StaticResource PrimaryButton}" Click="Create_Click" IsDefault="True"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

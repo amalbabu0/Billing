@@ -74,7 +74,7 @@ public sealed class InvoiceService(Db db, UserSession session, AuditService audi
         return id;
     }
 
-    internal static string? FullAddress(Customer c) =>
+    public static string? FullAddress(Customer c) =>
         string.Join(", ", new[] { c.BillingAddress, c.City, c.State, c.Pincode }.Where(x => !string.IsNullOrWhiteSpace(x))) is { Length: > 0 } s ? s : null;
 
     public async Task DeleteDraftAsync(long id)

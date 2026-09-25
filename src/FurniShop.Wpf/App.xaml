@@ -1,0 +1,28 @@
+<Application x:Class="FurniShop.Wpf.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:FurniShop.Wpf.Converters"
+             ShutdownMode="OnExplicitShutdown">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Themes/Theme.xaml"/>
+                <ResourceDictionary>
+                    <conv:MoneyConverter x:Key="Money"/>
+                    <conv:QtyConverter x:Key="Qty"/>
+                    <conv:DateConverter x:Key="Date"/>
+                    <conv:StatusLabelConverter x:Key="StatusLabel"/>
+                    <conv:BoolToVisibilityConverter x:Key="BoolToVis"/>
+                    <conv:InverseBoolConverter x:Key="Not"/>
+                    <conv:NullToVisibilityConverter x:Key="NullToVis"/>
+                    <conv:EqualsConverter x:Key="Equals"/>
+                    <conv:BalanceBrushConverter x:Key="BalanceBrush"/>
+                    <conv:ErrorConverter x:Key="Err"/>
+                    <conv:ToneBrushConverter x:Key="ToneBrush"/>
+                    <conv:DecimalTextConverter x:Key="Dec"/>
+                </ResourceDictionary>
+                <ResourceDictionary Source="Themes/Templates.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

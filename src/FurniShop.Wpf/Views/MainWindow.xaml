@@ -1,0 +1,366 @@
+<Window x:Class="FurniShop.Wpf.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:FurniShop.Wpf.ViewModels"
+        xmlns:c="clr-namespace:FurniShop.Wpf.Controls"
+        Title="{Binding ShopName, StringFormat={}{0} — FurniShop}" Width="1440" Height="900" MinWidth="360" MinHeight="560"
+        WindowStartupLocation="CenterScreen" WindowState="Maximized" Background="{StaticResource AppBackground}"
+        FontFamily="Segoe UI" TextOptions.TextFormattingMode="Display" UseLayoutRounding="True"
+        d:DataContext="{d:DesignInstance vm:ShellViewModel}" xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="d">
+    <Window.InputBindings>
+        <KeyBinding Key="F2" Command="{Binding NewInvoiceCommand}"/>
+        <KeyBinding Key="Left" Modifiers="Alt" Command="{Binding GoBackCommand}"/>
+    </Window.InputBindings>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- ======================================================= Sidebar -->
+        <Border x:Name="Sidebar" Background="{StaticResource Sidebar}">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Width" Value="248"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsSidebarCollapsed}" Value="True">
+                            <Setter Property="Width" Value="64"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="14,16,10,14">
+                    <Border Width="36" Height="36" CornerRadius="9" Background="{StaticResource Primary}">
+                        <TextBlock Text="&#xE80F;" Style="{StaticResource Icon}" Foreground="White" HorizontalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Margin="10,0,0,0" VerticalAlignment="Center"
+                                Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+                        <TextBlock Text="{Binding ShopName}" Foreground="White" FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis" MaxWidth="170"/>
+                        <TextBlock Text="FurniShop ERP" Foreground="{StaticResource SidebarMuted}" FontSize="11"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- user card -->
+                <Border DockPanel.Dock="Bottom" Margin="10" Padding="10" CornerRadius="8" Background="{StaticResource SidebarHover}">
+                    <StackPanel Orientation="Horizontal">
+                        <Border Width="32" Height="32" CornerRadius="16" Background="{StaticResource Accent}">
+                            <TextBlock Text="{Binding UserInitials}" Foreground="White" FontWeight="Bold" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Margin="10,0,0,0" VerticalAlignment="Center"
+                                    Visibility="{Binding IsSidebarCollapsed, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+                            <TextBlock Text="{Binding UserName}" Foreground="White" FontSize="12.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxWidth="160"/>
+                            <TextBlock Text="{Binding UserRole}" Foreground="{StaticResource SidebarMuted}" FontSize="11"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+                    <ItemsControl ItemsSource="{Binding Menu}" Margin="8,0,8,8" Focusable="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:NavGroup}">
+                                <StackPanel>
+                                    <Button Command="{Binding DataContext.ToggleGroupCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding}" ToolTip="{Binding Label}" AutomationProperties.Name="{Binding Label}">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border x:Name="bd" CornerRadius="7" Padding="10,9" Margin="0,1" Background="Transparent">
+                                                    <DockPanel>
+                                                        <TextBlock x:Name="chev" DockPanel.Dock="Right" Text="&#xE70D;" Style="{StaticResource Icon}" FontSize="10"
+                                                                   Foreground="{StaticResource SidebarMuted}"/>
+                                                        <TextBlock x:Name="ic" Text="{Binding Icon}" Style="{StaticResource Icon}" FontSize="16" Foreground="{StaticResource SidebarText}" Width="22"/>
+                                                        <TextBlock x:Name="lbl" Text="{Binding Label}" Foreground="{StaticResource SidebarText}" FontSize="13.5" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                                                    </DockPanel>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="bd" Property="Background" Value="{StaticResource SidebarHover}"/>
+                                                    </Trigger>
+                                                    <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                        <Setter TargetName="ic" Property="Foreground" Value="{StaticResource Accent}"/>
+                                                        <Setter TargetName="lbl" Property="Foreground" Value="White"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsSingle}" Value="True">
+                                                        <Setter TargetName="chev" Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsExpanded}" Value="True">
+                                                        <Setter TargetName="chev" Property="Text" Value="&#xE70E;"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                                        <Setter TargetName="lbl" Property="Visibility" Value="Collapsed"/>
+                                                        <Setter TargetName="chev" Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                    <ItemsControl ItemsSource="{Binding Items}" Margin="32,0,0,4" Focusable="False">
+                                        <ItemsControl.Style>
+                                            <Style TargetType="ItemsControl">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding IsExpanded}" Value="True"/>
+                                                            <Condition Binding="{Binding IsSingle}" Value="False"/>
+                                                            <Condition Binding="{Binding DataContext.IsSidebarCollapsed, RelativeSource={RelativeSource AncestorType=Window}}" Value="False"/>
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </MultiDataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ItemsControl.Style>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="{x:Type vm:NavItem}">
+                                                <Button Command="{Binding DataContext.NavigateToCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}" AutomationProperties.Name="{Binding Label}">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border x:Name="bd" CornerRadius="6" Padding="10,7" Margin="0,1" Background="Transparent">
+                                                                <TextBlock x:Name="t" Text="{Binding Label}" FontSize="13" Foreground="{StaticResource SidebarMuted}"/>
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter TargetName="bd" Property="Background" Value="{StaticResource SidebarHover}"/>
+                                                                    <Setter TargetName="t" Property="Foreground" Value="White"/>
+                                                                </Trigger>
+                                                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                                                    <Setter TargetName="bd" Property="Background" Value="{StaticResource SidebarHover}"/>
+                                                                </Trigger>
+                                                                <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                                    <Setter TargetName="bd" Property="Background" Value="{StaticResource SidebarActive}"/>
+                                                                    <Setter TargetName="t" Property="Foreground" Value="White"/>
+                                                                    <Setter TargetName="t" Property="FontWeight" Value="SemiBold"/>
+                                                                </DataTrigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+
+        <!-- ======================================================= Top bar + content -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="60"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1">
+                <DockPanel Margin="12,0,16,0">
+                    <Button DockPanel.Dock="Left" Style="{StaticResource IconButton}" Content="&#xE700;" Command="{Binding ToggleSidebarCommand}" ToolTip="Menu"
+                            AutomationProperties.Name="Toggle menu"/>
+                    <Button DockPanel.Dock="Left" Style="{StaticResource IconButton}" Content="&#xE72B;" Command="{Binding GoBackCommand}" ToolTip="Back (Alt+Left)"
+                            IsEnabled="{Binding CanGoBack}" AutomationProperties.Name="Back"/>
+
+                    <!-- user menu -->
+                    <Grid DockPanel.Dock="Right">
+                        <ToggleButton x:Name="UserMenuButton" IsChecked="{Binding IsUserMenuOpen}" Cursor="Hand" Background="Transparent" BorderThickness="0"
+                                      AutomationProperties.Name="User menu" ToolTip="{Binding UserName}">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="ToggleButton">
+                                    <Border Width="34" Height="34" CornerRadius="17" Background="{StaticResource Primary}">
+                                        <TextBlock Text="{Binding UserInitials}" Foreground="White" FontWeight="Bold" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
+                        <Popup IsOpen="{Binding IsUserMenuOpen}" PlacementTarget="{Binding ElementName=UserMenuButton}" Placement="Bottom" StaysOpen="False"
+                               HorizontalOffset="-190" VerticalOffset="8" AllowsTransparency="True">
+                            <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="10" Padding="8"
+                                    Width="230" Margin="10" Effect="{StaticResource PopupShadow}">
+                                <StackPanel>
+                                    <StackPanel Margin="8,6,8,10">
+                                        <TextBlock Text="{Binding UserName}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding UserRole}" Style="{StaticResource Muted}"/>
+                                    </StackPanel>
+                                    <Button Style="{StaticResource GhostButton}" HorizontalContentAlignment="Left" Command="{Binding ChangePasswordCommand}">
+                                        <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource Icon}" Text="&#xE72E;" Margin="0,0,10,0"/><TextBlock Text="Change password"/></StackPanel>
+                                    </Button>
+                                    <Button Style="{StaticResource GhostButton}" HorizontalContentAlignment="Left" Command="{Binding SignOutCommand}">
+                                        <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource Icon}" Text="&#xE7E8;" Margin="0,0,10,0"/><TextBlock Text="Sign out"/></StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+                        </Popup>
+                    </Grid>
+
+                    <!-- notifications -->
+                    <Grid DockPanel.Dock="Right" Margin="0,0,10,0">
+                        <Button x:Name="BellButton" Style="{StaticResource IconButton}" Content="&#xEA8F;" Command="{Binding OpenNotificationsCommand}" ToolTip="Notifications"
+                                AutomationProperties.Name="Notifications"/>
+                        <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,2,0" MinWidth="16" Height="16" CornerRadius="8" Background="{StaticResource ErrorFg}"
+                                IsHitTestVisible="False" Visibility="{Binding UnreadCount, Converter={StaticResource NullToVis}}">
+                            <TextBlock Text="{Binding UnreadCount}" Foreground="White" FontSize="10" FontWeight="Bold" HorizontalAlignment="Center" Margin="4,0"/>
+                        </Border>
+                        <Popup IsOpen="{Binding IsNotificationsOpen}" PlacementTarget="{Binding ElementName=BellButton}" Placement="Bottom" StaysOpen="False"
+                               HorizontalOffset="-300" VerticalOffset="8" AllowsTransparency="True">
+                            <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="10" Width="360" Margin="10"
+                                    Effect="{StaticResource PopupShadow}">
+                                <DockPanel MaxHeight="440">
+                                    <DockPanel DockPanel.Dock="Top" Margin="14,12">
+                                        <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="Mark all read" Command="{Binding MarkAllReadCommand}"/>
+                                        <TextBlock Text="Notifications" FontWeight="SemiBold" FontSize="14"/>
+                                    </DockPanel>
+                                    <c:EmptyState DockPanel.Dock="Top" Title="You're all caught up" Icon="&#xEA8F;" Margin="10,20"
+                                                  Visibility="{Binding Notifications.Count, Converter={StaticResource NullToVis}, ConverterParameter=invert}"/>
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{Binding Notifications}" Margin="6,0,6,8">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Button Style="{StaticResource GhostButton}" HorizontalContentAlignment="Stretch" Padding="8,8" Margin="0,1"
+                                                            Command="{Binding DataContext.OpenNotificationCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}">
+                                                        <StackPanel HorizontalAlignment="Left">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <c:StatusBadge Status="{Binding Kind}" Text="{Binding Title}"/>
+                                                                <TextBlock Text="{Binding CreatedAt, Converter={StaticResource Date}, ConverterParameter=time}" Style="{StaticResource Muted}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                                            </StackPanel>
+                                                            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" FontWeight="Normal" Foreground="{StaticResource TextPrimary}" Margin="0,4,0,0" MaxWidth="310"/>
+                                                        </StackPanel>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </DockPanel>
+                            </Border>
+                        </Popup>
+                    </Grid>
+
+                    <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Command="{Binding NewInvoiceCommand}" Margin="0,0,12,0"
+                            ToolTip="New invoice (F2)" Visibility="{Binding CanCreateInvoice, Converter={StaticResource BoolToVis}}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE710;" FontSize="12" Margin="0,0,8,0"/>
+                            <TextBlock x:Name="NewInvoiceText" Text="New invoice"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- global search -->
+                    <Grid Margin="8,0,16,0" MaxWidth="560" HorizontalAlignment="Left" VerticalAlignment="Center">
+                        <TextBox x:Name="GlobalSearchBox" Text="{Binding GlobalSearch, UpdateSourceTrigger=PropertyChanged}" Padding="34,0,8,0" MinWidth="220"
+                                 AutomationProperties.Name="Search products, customers, invoices, orders">
+                            <TextBox.InputBindings>
+                                <KeyBinding Key="Enter" Command="{Binding SearchEnterCommand}"/>
+                            </TextBox.InputBindings>
+                        </TextBox>
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xE721;" FontSize="14" Foreground="{StaticResource TextMuted}" Margin="12,0,0,0" IsHitTestVisible="False"
+                                   HorizontalAlignment="Left"/>
+                        <TextBlock Text="Search products, SKU, barcode, customers, mobile, invoice / order no…  (Ctrl+K)" Foreground="{StaticResource TextMuted}"
+                                   Margin="36,0,8,0" VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis"
+                                   Visibility="{Binding GlobalSearch, Converter={StaticResource NullToVis}, ConverterParameter=invert}"/>
+                        <Popup IsOpen="{Binding IsSearchOpen}" PlacementTarget="{Binding ElementName=GlobalSearchBox}" Placement="Bottom" StaysOpen="False"
+                               AllowsTransparency="True" Width="{Binding ActualWidth, ElementName=GlobalSearchBox}">
+                            <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="10" Margin="0,6,0,10"
+                                    Effect="{StaticResource PopupShadow}" MinWidth="360">
+                                <DockPanel MaxHeight="460">
+                                    <c:EmptyState DockPanel.Dock="Top" Title="No matches" Icon="&#xE721;" Margin="10,16"
+                                                  Visibility="{Binding SearchResults.Count, Converter={StaticResource NullToVis}, ConverterParameter=invert}"/>
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{Binding SearchResults}" Margin="6">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Button Style="{StaticResource GhostButton}" HorizontalContentAlignment="Stretch" Padding="10,6"
+                                                            Command="{Binding DataContext.OpenSearchResultCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}">
+                                                        <DockPanel>
+                                                            <Border DockPanel.Dock="Left" Background="{StaticResource NeutralBg}" CornerRadius="5" Padding="6,2" Margin="0,0,10,0" MinWidth="84">
+                                                                <TextBlock Text="{Binding Kind}" FontSize="11" Foreground="{StaticResource NeutralFg}" HorizontalAlignment="Center"/>
+                                                            </Border>
+                                                            <c:StatusBadge DockPanel.Dock="Right" Status="{Binding Status}"/>
+                                                            <StackPanel HorizontalAlignment="Left">
+                                                                <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                                                                <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Muted}" FontWeight="Normal"/>
+                                                            </StackPanel>
+                                                        </DockPanel>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </DockPanel>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                </DockPanel>
+            </Border>
+
+            <ContentControl Grid.Row="1" Content="{Binding CurrentPage}" Focusable="False" IsTabStop="False"/>
+        </Grid>
+
+        <!-- ======================================================= Toasts -->
+        <ItemsControl Grid.ColumnSpan="2" ItemsSource="{Binding Toasts}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,20,20"
+                      Panel.ZIndex="50" MaxWidth="440" Focusable="False">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:ToastItem}">
+                    <Border CornerRadius="9" Padding="14,11" Margin="0,8,0,0" Background="#1C1A17" Effect="{StaticResource PopupShadow}"
+                            MouseLeftButtonUp="Toast_Click" Cursor="Hand" AutomationProperties.LiveSetting="Assertive">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Left" Style="{StaticResource Icon}" Text="{Binding Icon}" FontSize="15" Margin="0,0,10,0"
+                                       Foreground="{Binding Tone, Converter={StaticResource ToneBrush}, ConverterParameter=bg}" VerticalAlignment="Top" Padding="0,1,0,0"/>
+                            <TextBlock Text="{Binding Message}" Foreground="White" TextWrapping="Wrap" FontSize="13"/>
+                        </DockPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- ======================================================= Dialogs (stacked) -->
+        <ItemsControl Grid.ColumnSpan="2" ItemsSource="{Binding Dialogs}" Panel.ZIndex="40" Focusable="False"
+                      Visibility="{Binding HasDialog, Converter={StaticResource BoolToVis}}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><Grid/></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:DialogViewModel}">
+                    <Grid Background="#80181512" KeyboardNavigation.TabNavigation="Cycle">
+                        <Grid.InputBindings>
+                            <KeyBinding Key="Escape" Command="{Binding CancelCommand}"/>
+                        </Grid.InputBindings>
+                        <Border Background="{StaticResource Surface}" CornerRadius="12" Width="{Binding DialogWidth}" MaxWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Window}}"
+                                Margin="16" VerticalAlignment="Center" HorizontalAlignment="Center" Effect="{StaticResource PopupShadow}">
+                            <DockPanel MaxHeight="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=Window}}">
+                                <DockPanel DockPanel.Dock="Top" Margin="22,18,14,6">
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE711;" Command="{Binding CancelCommand}" ToolTip="Close (Esc)"
+                                            AutomationProperties.Name="Close"/>
+                                    <TextBlock Text="{Binding DialogTitle}" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                </DockPanel>
+                                <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource Border}" BorderThickness="0,1,0,0" Padding="22,12"
+                                        Visibility="{Binding ShowFooter, Converter={StaticResource BoolToVis}}">
+                                    <DockPanel>
+                                        <ProgressBar DockPanel.Dock="Left" IsIndeterminate="True" Width="80" Height="4" VerticalAlignment="Center"
+                                                     Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}"/>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <Button Content="Cancel" Command="{Binding CancelCommand}" MinWidth="90" Margin="0,0,8,0"/>
+                                            <Button Content="{Binding AcceptText}" Command="{Binding AcceptCommand}" MinWidth="110" IsDefault="True">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsAcceptDanger}" Value="True">
+                                                                <Setter Property="Background" Value="{StaticResource ErrorFg}"/>
+                                                                <Setter Property="BorderBrush" Value="{StaticResource ErrorFg}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="22,6,22,16">
+                                    <ContentControl Content="{Binding}" Focusable="False" IsTabStop="False"/>
+                                </ScrollViewer>
+                            </DockPanel>
+                        </Border>
+                    </Grid>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </Grid>
+</Window>

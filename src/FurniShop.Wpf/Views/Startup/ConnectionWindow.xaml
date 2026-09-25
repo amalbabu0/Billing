@@ -1,0 +1,29 @@
+<Window x:Class="FurniShop.Wpf.Views.Startup.ConnectionWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="FurniShop — Connect to database" Width="620" SizeToContent="Height" WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize" Background="{StaticResource AppBackground}" FontFamily="Segoe UI">
+    <Border Style="{StaticResource Card}" Margin="20" Padding="26">
+        <StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                <TextBlock Style="{StaticResource Icon}" Text="&#xE968;" FontSize="22" Foreground="{StaticResource Primary}" Margin="0,0,10,0"/>
+                <TextBlock Text="Connect to your database" Style="{StaticResource PageTitle}"/>
+            </StackPanel>
+            <TextBlock Style="{StaticResource PageSubtitle}" Margin="0,0,0,18"
+                       Text="Paste the connection string from your Neon project (Dashboard → Connect). Both the postgresql:// URL and the .NET connection string formats work. The details are stored encrypted for this Windows user only."/>
+            <TextBlock Text="Connection string" Style="{StaticResource Label}"/>
+            <TextBox x:Name="ConnectionBox" Style="{StaticResource MultilineBox}" MinHeight="84" FontFamily="Consolas"
+                     AutomationProperties.Name="Connection string"/>
+            <TextBlock Style="{StaticResource Muted}" Margin="0,6,0,0"
+                       Text="Example: postgresql://neondb_owner:••••@ep-cool-name-123456-pooler.ap-south-1.aws.neon.tech/neondb?sslmode=require"/>
+            <Border x:Name="StatusPanel" Visibility="Collapsed" Margin="0,14,0,0" CornerRadius="8" Padding="12">
+                <TextBlock x:Name="StatusText" TextWrapping="Wrap" FontSize="13"/>
+            </Border>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+                <Button Content="Exit" Click="Exit_Click" Margin="0,0,8,0" MinWidth="90"/>
+                <Button x:Name="TestButton" Content="Test connection" Click="Test_Click" Margin="0,0,8,0"/>
+                <Button x:Name="SaveButton" Content="Save and continue" Style="{StaticResource PrimaryButton}" Click="Save_Click" IsDefault="True"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

@@ -343,14 +343,14 @@ public static class Layouts
             c.Image(d.Logo, m, y, 58, 58);
             x = m + 68;
         }
-        var leftW = W * 0.58 - (x - m);
+        var leftW = W * 0.56 - (x - m);
         c.Text(d.Shop.ShopName, x, y, 17, true, Accent);
         var ly = y + 22;
         if (!string.IsNullOrWhiteSpace(d.Shop.Tagline)) { c.Text(d.Shop.Tagline!, x, ly, 8, false, Muted); ly += 11; }
         var addr = string.Join(", ", new[] { d.Shop.Address, d.Shop.City, IndianStates.NameOf(d.Shop.StateCode), d.Shop.Pincode }.Where(s => !string.IsNullOrWhiteSpace(s)));
         ly += c.Paragraph(addr, x, ly, leftW, 8, false, Ink, TextAlign.Left, 1.25);
         var contact = string.Join("   ", new[] { d.Shop.Phone is { Length: > 0 } ph ? "Ph: " + ph : null, d.Shop.Email, d.Shop.Website }.Where(s => !string.IsNullOrWhiteSpace(s)));
-        if (contact.Length > 0) { c.Text(contact, x, ly, 8, false, Ink); ly += 11; }
+        if (contact.Length > 0) ly += c.Paragraph(contact, x, ly, leftW, 8, false, Ink, TextAlign.Left, 1.25);
         if (!string.IsNullOrWhiteSpace(d.Shop.Gstin)) { c.Text($"GSTIN: {d.Shop.Gstin}", x, ly, 8.5, true, Ink); ly += 11; }
 
         var rw = W * 0.40;
