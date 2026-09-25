@@ -1,0 +1,390 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="clr-namespace:FurniShop.Wpf.ViewModels"
+                    xmlns:c="clr-namespace:FurniShop.Wpf.Controls">
+
+    <!-- =================================================================== Purchase editor -->
+    <DataTemplate DataType="{x:Type vm:PurchaseEditorViewModel}">
+        <Grid>
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="24,20">
+                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource PageHeading}" Margin="0,0,0,14" Focusable="False"/>
+                    <Border Style="{StaticResource FlatCard}" Margin="0,0,0,12">
+                        <WrapPanel>
+                            <StackPanel Width="280" Margin="0,0,12,8">
+                                <DockPanel><Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="+ New" Command="{Binding NewSupplierCommand}"/><TextBlock Text="Supplier *" Style="{StaticResource Label}"/></DockPanel>
+                                <ComboBox ItemsSource="{Binding Suppliers}" SelectedItem="{Binding Supplier}" DisplayMemberPath="Name" IsTextSearchEnabled="True"/>
+                                <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=SupplierId}" Style="{StaticResource FieldError}"/>
+                            </StackPanel>
+                            <StackPanel Width="170" Margin="0,0,12,8">
+                                <TextBlock Text="Supplier bill no" Style="{StaticResource Label}"/>
+                                <TextBox Text="{Binding SupplierInvoiceNo}"/>
+                                <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=SupplierInvoiceNo}" Style="{StaticResource FieldError}"/>
+                            </StackPanel>
+                            <StackPanel Width="150" Margin="0,0,12,8"><TextBlock Text="Bill date" Style="{StaticResource Label}"/><DatePicker SelectedDate="{Binding Date}"/></StackPanel>
+                            <StackPanel Width="150" Margin="0,0,12,8"><TextBlock Text="Payment due" Style="{StaticResource Label}"/><DatePicker SelectedDate="{Binding DueDate}"/></StackPanel>
+                            <Border Style="{StaticResource SoftPanel}" VerticalAlignment="Bottom" Margin="0,0,0,8" Visibility="{Binding InterState, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="Inter-state supplier → IGST"/>
+                            </Border>
+                        </WrapPanel>
+                    </Border>
+                    <Border Style="{StaticResource FlatCard}" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="Items received" Style="{StaticResource SectionTitle}"/>
+                            <TextBox Text="{Binding Search, UpdateSourceTrigger=PropertyChanged, Delay=300}" Width="420" HorizontalAlignment="Left" AutomationProperties.Name="Scan or search product"/>
+                            <TextBlock Text="Scan barcode or search. New products? Create them first under Products." Style="{StaticResource Muted}" Margin="0,4"/>
+                            <ItemsControl ItemsSource="{Binding Results}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Padding="8,4"
+                                                Command="{Binding DataContext.AddCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}">
+                                            <TextBlock><Run Text="{Binding DisplayName, Mode=OneWay}" FontWeight="SemiBold"/> · <Run Text="{Binding Sku, Mode=OneWay}"/></TextBlock>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Grid Margin="0,10,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition/><ColumnDefinition Width="90"/><ColumnDefinition Width="80"/><ColumnDefinition Width="110"/><ColumnDefinition Width="80"/><ColumnDefinition Width="80"/><ColumnDefinition Width="120"/><ColumnDefinition Width="36"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Item" Style="{StaticResource Label}"/>
+                                <TextBlock Grid.Column="1" Text="HSN" Style="{StaticResource Label}"/>
+                                <TextBlock Grid.Column="2" Text="Qty" Style="{StaticResource Label}" HorizontalAlignment="Right"/>
+                                <TextBlock Grid.Column="3" Text="Cost (ex-GST)" Style="{StaticResource Label}" HorizontalAlignment="Right"/>
+                                <TextBlock Grid.Column="4" Text="Disc %" Style="{StaticResource Label}" HorizontalAlignment="Right"/>
+                                <TextBlock Grid.Column="5" Text="GST %" Style="{StaticResource Label}" HorizontalAlignment="Right"/>
+                                <TextBlock Grid.Column="6" Text="Line total" Style="{StaticResource Label}" HorizontalAlignment="Right"/>
+                            </Grid>
+                            <ItemsControl ItemsSource="{Binding Lines}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:PurchaseLineVm}">
+                                        <Grid Margin="0,3">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition/><ColumnDefinition Width="90"/><ColumnDefinition Width="80"/><ColumnDefinition Width="110"/><ColumnDefinition Width="80"/><ColumnDefinition Width="80"/><ColumnDefinition Width="120"/><ColumnDefinition Width="36"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center"><TextBlock Text="{Binding Description}" FontWeight="SemiBold"/><TextBlock Text="{Binding Sku}" Style="{StaticResource Muted}"/></StackPanel>
+                                            <TextBox Grid.Column="1" Text="{Binding HsnCode}" Margin="4,0"/>
+                                            <TextBox Grid.Column="2" Style="{StaticResource NumberBox}" Text="{Binding Quantity, Converter={StaticResource Dec}, UpdateSourceTrigger=PropertyChanged, Delay=400}" Margin="4,0"/>
+                                            <TextBox Grid.Column="3" Style="{StaticResource NumberBox}" Text="{Binding UnitCost, Converter={StaticResource Dec}, UpdateSourceTrigger=PropertyChanged, Delay=400}" Margin="4,0"/>
+                                            <TextBox Grid.Column="4" Style="{StaticResource NumberBox}" Text="{Binding DiscountPercent, Converter={StaticResource Dec}, UpdateSourceTrigger=PropertyChanged, Delay=400}" Margin="4,0"/>
+                                            <ComboBox Grid.Column="5" ItemsSource="{Binding DataContext.GstRates, RelativeSource={RelativeSource AncestorType=ItemsControl}}" SelectedItem="{Binding GstRate}"
+                                                      ItemStringFormat="{}{0:0.##}%" Margin="4,0"/>
+                                            <TextBlock Grid.Column="6" Text="{Binding LineTotal, Converter={StaticResource Money}}" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                            <Button Grid.Column="7" Style="{StaticResource IconButton}" Content="&#xE74D;" Foreground="{StaticResource ErrorFg}"
+                                                    Command="{Binding DataContext.RemoveCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=Lines}" Style="{StaticResource FieldError}"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource FlatCard}" Margin="0,0,0,12">
+                        <DockPanel>
+                            <Grid DockPanel.Dock="Right" MinWidth="300">
+                                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                                <TextBlock Text="Taxable" Margin="0,3"/><TextBlock Grid.Column="1" Text="{Binding Taxable, Converter={StaticResource Money}}" HorizontalAlignment="Right"/>
+                                <TextBlock Grid.Row="1" Text="GST (input credit)" Margin="0,3"/><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Tax, Converter={StaticResource Money}}" HorizontalAlignment="Right"/>
+                                <TextBlock Grid.Row="2" Text="Other charges (freight, loading)" Margin="0,3" VerticalAlignment="Center"/>
+                                <TextBox Grid.Row="2" Grid.Column="1" Style="{StaticResource NumberBox}" Width="120" Text="{Binding OtherCharges, Converter={StaticResource Dec}, UpdateSourceTrigger=PropertyChanged, Delay=400}"/>
+                                <TextBlock Grid.Row="3" Text="Bill total" FontWeight="Bold" FontSize="16" Margin="0,6"/>
+                                <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Total, Converter={StaticResource Money}}" FontWeight="Bold" FontSize="16" HorizontalAlignment="Right" Margin="0,6"/>
+                            </Grid>
+                            <StackPanel Margin="0,0,24,0">
+                                <TextBlock Text="Paid now (optional)" Style="{StaticResource Label}" Visibility="{Binding CanPay, Converter={StaticResource BoolToVis}}"/>
+                                <WrapPanel Visibility="{Binding CanPay, Converter={StaticResource BoolToVis}}">
+                                    <TextBox Style="{StaticResource NumberBox}" Width="130" Margin="0,0,8,8" Text="{Binding PaidNow, Converter={StaticResource Dec}}"/>
+                                    <ComboBox Width="150" Margin="0,0,8,8" ItemsSource="{Binding Methods}" SelectedItem="{Binding PaidMethod}"/>
+                                    <TextBox Width="180" Margin="0,0,8,8" Text="{Binding PaidReference}" ToolTip="UTR / cheque no"/>
+                                </WrapPanel>
+                                <TextBlock Text="Notes" Style="{StaticResource Label}"/>
+                                <TextBox Text="{Binding Notes}" Style="{StaticResource MultilineBox}" MinHeight="48"/>
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="Save draft" Command="{Binding SaveDraftCommand}" Margin="0,0,8,0" MinWidth="120"/>
+                        <Button Content="Complete purchase &amp; add stock" Command="{Binding CompleteCommand}" Style="{StaticResource PrimaryButton}" MinWidth="220"/>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Busy}" Focusable="False"/>
+        </Grid>
+    </DataTemplate>
+
+    <!-- =================================================================== Purchase list / detail -->
+    <DataTemplate DataType="{x:Type vm:PurchaseListViewModel}">
+        <Grid Margin="24,20">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <DockPanel Margin="0,0,0,14">
+                <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="+ New purchase" Command="{Binding NewCommand}" VerticalAlignment="Top"
+                        Visibility="{Binding CanCreate, Converter={StaticResource BoolToVis}}"/>
+                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource PageHeading}" Focusable="False"/>
+            </DockPanel>
+            <ContentControl Grid.Row="1" Content="{Binding}" ContentTemplate="{StaticResource ListToolbar}" Focusable="False"/>
+            <Border Grid.Row="2" Style="{StaticResource FlatCard}" Padding="0">
+                <Grid>
+                    <DataGrid ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" c:GridBehaviors.OpenCommand="{Binding OpenCommand}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Purchase" Binding="{Binding Number}" Width="140" ElementStyle="{StaticResource BoldCell}"/>
+                            <DataGridTextColumn Header="Date" Binding="{Binding PurchaseDate, Converter={StaticResource Date}}" Width="105"/>
+                            <DataGridTextColumn Header="Supplier" Binding="{Binding SupplierName}" Width="*"/>
+                            <DataGridTextColumn Header="Bill no" Binding="{Binding SupplierInvoiceNo}" Width="120"/>
+                            <DataGridTextColumn Header="Total" Binding="{Binding GrandTotal, Converter={StaticResource Money}}" Width="120" ElementStyle="{StaticResource RightCell}"/>
+                            <DataGridTextColumn Header="Paid" Binding="{Binding Paid, Converter={StaticResource Money}}" Width="120" ElementStyle="{StaticResource RightCell}"/>
+                            <DataGridTextColumn Header="Balance" Binding="{Binding Balance, Converter={StaticResource Money}}" Width="120" ElementStyle="{StaticResource RightCell}"/>
+                            <DataGridTemplateColumn Header="Status" Width="140"><DataGridTemplateColumn.CellTemplate><DataTemplate><c:StatusBadge Status="{Binding PaymentState}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <c:EmptyState Title="No purchases" Message="{Binding EmptyMessage}" Icon="&#xE719;" Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}"/>
+                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Busy}" Focusable="False"/>
+                </Grid>
+            </Border>
+            <ContentControl Grid.Row="3" Content="{Binding}" ContentTemplate="{StaticResource ListPager}" Focusable="False"/>
+        </Grid>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:PurchaseDetailViewModel}">
+        <Grid>
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="24,20">
+                    <DockPanel Margin="0,0,0,14">
+                        <c:StatusBadge DockPanel.Dock="Right" Status="{Binding Purchase.PaymentState}" VerticalAlignment="Top"/>
+                        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource PageHeading}" Focusable="False"/>
+                    </DockPanel>
+                    <WrapPanel Margin="0,0,0,12">
+                        <Button Content="Pay supplier" Command="{Binding PayCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,8,8" Visibility="{Binding CanPay, Converter={StaticResource BoolToVis}}"/>
+                        <Button Content="Supplier" Command="{Binding OpenSupplierCommand}" Margin="0,0,8,8"/>
+                        <Button Content="Cancel purchase" Command="{Binding CancelPurchaseCommand}" Style="{StaticResource DangerButton}" Margin="0,0,8,8" Visibility="{Binding CanCancel, Converter={StaticResource BoolToVis}}"/>
+                    </WrapPanel>
+                    <Border Style="{StaticResource FlatCard}" Margin="0,0,0,12">
+                        <StackPanel>
+                            <DataGrid ItemsSource="{Binding Purchase.Lines}" MaxHeight="420">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Item" Binding="{Binding Description}" Width="*" ElementStyle="{StaticResource BoldCell}"/>
+                                    <DataGridTextColumn Header="SKU" Binding="{Binding Sku}" Width="120"/>
+                                    <DataGridTextColumn Header="HSN" Binding="{Binding HsnCode}" Width="80"/>
+                                    <DataGridTextColumn Header="Qty" Binding="{Binding Quantity, Converter={StaticResource Qty}}" Width="60" ElementStyle="{StaticResource RightCell}"/>
+                                    <DataGridTextColumn Header="Cost" Binding="{Binding UnitCost, Converter={StaticResource Money}}" Width="110" ElementStyle="{StaticResource RightCell}"/>
+                                    <DataGridTextColumn Header="Taxable" Binding="{Binding TaxableAmount, Converter={StaticResource Money}}" Width="120" ElementStyle="{StaticResource RightCell}"/>
+                                    <DataGridTextColumn Header="GST %" Binding="{Binding GstRate, StringFormat={}{0:0.##}%}" Width="60"/>
+                                    <DataGridTextColumn Header="Total" Binding="{Binding LineTotal, Converter={StaticResource Money}}" Width="120" ElementStyle="{StaticResource RightCell}"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                            <Grid HorizontalAlignment="Right" MinWidth="300" Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                                <TextBlock Text="Taxable" Margin="0,3"/><TextBlock Grid.Column="1" Text="{Binding Purchase.TaxableTotal, Converter={StaticResource Money}}" HorizontalAlignment="Right"/>
+                                <TextBlock Grid.Row="1" Text="CGST + SGST" Margin="0,3"/><TextBlock Grid.Row="1" Grid.Column="1" HorizontalAlignment="Right"><Run Text="{Binding Purchase.CgstTotal, Converter={StaticResource Money}, Mode=OneWay}"/> + <Run Text="{Binding Purchase.SgstTotal, Converter={StaticResource Money}, Mode=OneWay}"/></TextBlock>
+                                <TextBlock Grid.Row="2" Text="IGST" Margin="0,3"/><TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Purchase.IgstTotal, Converter={StaticResource Money}}" HorizontalAlignment="Right"/>
+                                <TextBlock Grid.Row="3" Text="Other charges" Margin="0,3"/><TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Purchase.OtherCharges, Converter={StaticResource Money}}" HorizontalAlignment="Right"/>
+                                <TextBlock Grid.Row="4" Text="Total" FontWeight="Bold" Margin="0,3"/><TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Purchase.GrandTotal, Converter={StaticResource Money}}" FontWeight="Bold" HorizontalAlignment="Right"/>
+                                <TextBlock Grid.Row="5" Text="Balance payable" Foreground="{StaticResource ErrorFg}" Margin="0,3"/><TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding Purchase.Balance, Converter={StaticResource Money}}" Foreground="{StaticResource ErrorFg}" HorizontalAlignment="Right"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Busy}" Focusable="False"/>
+        </Grid>
+    </DataTemplate>
+
+    <!-- =================================================================== Suppliers -->
+    <DataTemplate DataType="{x:Type vm:SupplierListViewModel}">
+        <Grid Margin="24,20">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <DockPanel Margin="0,0,0,14">
+                <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="+ New supplier" Command="{Binding NewCommand}" VerticalAlignment="Top"
+                        Visibility="{Binding CanCreate, Converter={StaticResource BoolToVis}}"/>
+                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource PageHeading}" Focusable="False"/>
+            </DockPanel>
+            <ContentControl Grid.Row="1" Content="{Binding}" ContentTemplate="{StaticResource ListToolbar}" Focusable="False"/>
+            <Border Grid.Row="2" Style="{StaticResource FlatCard}" Padding="0">
+                <Grid>
+                    <DataGrid ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" c:GridBehaviors.OpenCommand="{Binding OpenCommand}">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="Supplier" Width="*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate><StackPanel VerticalAlignment="Center"><TextBlock Text="{Binding Name}" FontWeight="SemiBold"/><TextBlock Style="{StaticResource Muted}"><Run Text="{Binding Code, Mode=OneWay}"/> · <Run Text="{Binding ContactPerson, Mode=OneWay}"/></TextBlock></StackPanel></DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Mobile" Binding="{Binding Mobile}" Width="120"/>
+                            <DataGridTextColumn Header="GSTIN" Binding="{Binding Gstin}" Width="160"/>
+                            <DataGridTextColumn Header="Purchases" Binding="{Binding TotalPurchases, Converter={StaticResource Money}}" Width="130" ElementStyle="{StaticResource RightCell}"/>
+                            <DataGridTextColumn Header="Paid" Binding="{Binding TotalPaid, Converter={StaticResource Money}}" Width="130" ElementStyle="{StaticResource RightCell}"/>
+                            <DataGridTemplateColumn Header="Payable" Width="130">
+                                <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock Text="{Binding Outstanding, Converter={StaticResource Money}}" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{Binding Outstanding, Converter={StaticResource BalanceBrush}}"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <c:EmptyState Title="No suppliers" Message="{Binding EmptyMessage}" Icon="&#xE719;" Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}"/>
+                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Busy}" Focusable="False"/>
+                </Grid>
+            </Border>
+            <ContentControl Grid.Row="3" Content="{Binding}" ContentTemplate="{StaticResource ListPager}" Focusable="False"/>
+        </Grid>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:SupplierEditDialogViewModel}">
+        <StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                <StackPanel><TextBlock Text="Supplier name *" Style="{StaticResource Label}"/><TextBox Text="{Binding Model.Name}" c:FocusBehavior.FocusOnLoad="True"/>
+                    <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=Name}" Style="{StaticResource FieldError}"/></StackPanel>
+                <StackPanel Grid.Column="2"><TextBlock Text="Contact person" Style="{StaticResource Label}"/><TextBox Text="{Binding Model.ContactPerson}"/></StackPanel>
+            </Grid>
+            <Grid Margin="0,10,0,0">
+                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                <StackPanel><TextBlock Text="Mobile" Style="{StaticResource Label}"/><TextBox Text="{Binding Model.Mobile}"/>
+                    <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=Mobile}" Style="{StaticResource FieldError}"/></StackPanel>
+                <StackPanel Grid.Column="2"><TextBlock Text="WhatsApp" Style="{StaticResource Label}"/><TextBox Text="{Binding Model.Whatsapp}"/></StackPanel>
+                <StackPanel Grid.Column="4"><TextBlock Text="Email" Style="{StaticResource Label}"/><TextBox Text="{Binding Model.Email}"/>
+                    <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=Email}" Style="{StaticResource FieldError}"/></StackPanel>
+            </Grid>
+            <TextBlock Text="Address" Style="{StaticResource Label}" Margin="0,10,0,4"/>
+            <TextBox Text="{Binding Model.Address}" Style="{StaticResource MultilineBox}" MinHeight="48"/>
+            <Grid Margin="0,10,0,0">
+                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                <StackPanel><TextBlock Text="State" Style="{StaticResource Label}"/><ComboBox ItemsSource="{Binding States}" SelectedItem="{Binding State}" DisplayMemberPath="Display"/></StackPanel>
+                <StackPanel Grid.Column="2"><TextBlock Text="GSTIN" Style="{StaticResource Label}"/><TextBox Text="{Binding Model.Gstin}" CharacterCasing="Upper" MaxLength="15"/>
+                    <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=Gstin}" Style="{StaticResource FieldError}"/></StackPanel>
+            </Grid>
+            <TextBlock Text="Bank details" Style="{StaticResource SectionTitle}" Margin="0,14,0,6"/>
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                <StackPanel><TextBlock Text="Bank name" Style="{StaticResource Label}"/><TextBox Text="{Binding Model.BankName}"/></StackPanel>
+                <StackPanel Grid.Column="2"><TextBlock Text="Account no" Style="{StaticResource Label}"/><TextBox Text="{Binding Model.BankAccount}"/></StackPanel>
+                <StackPanel Grid.Column="4"><TextBlock Text="IFSC" Style="{StaticResource Label}"/><TextBox Text="{Binding Model.BankIfsc}" CharacterCasing="Upper" MaxLength="11"/>
+                    <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=BankIfsc}" Style="{StaticResource FieldError}"/></StackPanel>
+            </Grid>
+            <TextBlock Text="UPI ID" Style="{StaticResource Label}" Margin="0,10,0,4"/>
+            <TextBox Text="{Binding Model.UpiId}"/>
+            <TextBlock Text="Notes" Style="{StaticResource Label}" Margin="0,10,0,4"/>
+            <TextBox Text="{Binding Model.Notes}" Style="{StaticResource MultilineBox}" MinHeight="48"/>
+        </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:SupplierDetailViewModel}">
+        <Grid>
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="24,20">
+                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource PageHeading}" Margin="0,0,0,12" Focusable="False"/>
+                    <WrapPanel Margin="0,0,0,12">
+                        <Button Content="Pay supplier" Command="{Binding PayCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,8,8" Visibility="{Binding CanPay, Converter={StaticResource BoolToVis}}"/>
+                        <Button Content="New purchase" Command="{Binding NewPurchaseCommand}" Margin="0,0,8,8"/>
+                        <Button Content="Edit" Command="{Binding EditCommand}" Margin="0,0,8,8" Visibility="{Binding CanEdit, Converter={StaticResource BoolToVis}}"/>
+                        <Button Content="Delete" Command="{Binding DeleteCommand}" Style="{StaticResource DangerButton}" Margin="0,0,8,8" Visibility="{Binding CanEdit, Converter={StaticResource BoolToVis}}"/>
+                    </WrapPanel>
+                    <c:ResponsiveTiles MinTileWidth="220">
+                        <c:KpiCard Title="Total purchases" Value="{Binding Supplier.TotalPurchases, Converter={StaticResource Money}}" Icon="&#xE719;"/>
+                        <c:KpiCard Title="Paid" Value="{Binding Supplier.TotalPaid, Converter={StaticResource Money}}" Icon="&#xE8C7;" Tone="SUCCESS"/>
+                        <c:KpiCard Title="Outstanding payable" Value="{Binding Supplier.Outstanding, Converter={StaticResource Money}}" Icon="&#xE7BA;" Tone="WARNING"/>
+                    </c:ResponsiveTiles>
+                    <Border Style="{StaticResource FlatCard}" Margin="0,0,12,12">
+                        <WrapPanel>
+                            <StackPanel Margin="0,0,40,0">
+                                <TextBlock Text="CONTACT" Style="{StaticResource Label}"/>
+                                <TextBlock Text="{Binding Supplier.ContactPerson}" Style="{StaticResource Value}"/>
+                                <TextBlock Text="{Binding Supplier.Mobile}" Style="{StaticResource Value}"/>
+                                <TextBlock Text="{Binding Supplier.Email}" Style="{StaticResource Value}"/>
+                                <TextBlock Text="{Binding Supplier.Address}" Style="{StaticResource Muted}" MaxWidth="320"/>
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock Text="BANK" Style="{StaticResource Label}"/>
+                                <TextBlock Text="{Binding Supplier.BankName}" Style="{StaticResource Value}"/>
+                                <TextBlock Style="{StaticResource Value}"><Run Text="A/c"/> <Run Text="{Binding Supplier.BankAccount, Mode=OneWay}"/> · IFSC <Run Text="{Binding Supplier.BankIfsc, Mode=OneWay}"/></TextBlock>
+                                <TextBlock Text="{Binding Supplier.UpiId}" Style="{StaticResource Value}"/>
+                            </StackPanel>
+                        </WrapPanel>
+                    </Border>
+                    <Border Style="{StaticResource FlatCard}" Margin="0,0,12,12" Padding="12,4,12,12">
+                        <TabControl>
+                            <TabItem Header="Ledger">
+                                <DataGrid ItemsSource="{Binding Ledger}" MaxHeight="420">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Date" Binding="{Binding Date, Converter={StaticResource Date}}" Width="105"/>
+                                        <DataGridTextColumn Header="Document" Binding="{Binding DocNumber}" Width="140"/>
+                                        <DataGridTextColumn Header="Particulars" Binding="{Binding Particulars}" Width="*"/>
+                                        <DataGridTextColumn Header="Paid (Dr)" Binding="{Binding Debit, Converter={StaticResource Money}}" Width="120" ElementStyle="{StaticResource RightCell}"/>
+                                        <DataGridTextColumn Header="Purchase (Cr)" Binding="{Binding Credit, Converter={StaticResource Money}}" Width="120" ElementStyle="{StaticResource RightCell}"/>
+                                        <DataGridTextColumn Header="Payable" Binding="{Binding Balance, Converter={StaticResource Money}}" Width="120" ElementStyle="{StaticResource RightCell}"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </TabItem>
+                            <TabItem Header="Purchases">
+                                <DataGrid ItemsSource="{Binding Purchases}" MaxHeight="420" c:GridBehaviors.OpenCommand="{Binding OpenPurchaseCommand}">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Purchase" Binding="{Binding Number}" Width="140" ElementStyle="{StaticResource BoldCell}"/>
+                                        <DataGridTextColumn Header="Date" Binding="{Binding PurchaseDate, Converter={StaticResource Date}}" Width="105"/>
+                                        <DataGridTextColumn Header="Bill" Binding="{Binding SupplierInvoiceNo}" Width="*"/>
+                                        <DataGridTextColumn Header="Total" Binding="{Binding GrandTotal, Converter={StaticResource Money}}" Width="120" ElementStyle="{StaticResource RightCell}"/>
+                                        <DataGridTextColumn Header="Balance" Binding="{Binding Balance, Converter={StaticResource Money}}" Width="120" ElementStyle="{StaticResource RightCell}"/>
+                                        <DataGridTemplateColumn Header="Status" Width="140"><DataGridTemplateColumn.CellTemplate><DataTemplate><c:StatusBadge Status="{Binding PaymentState}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </TabItem>
+                        </TabControl>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Busy}" Focusable="False"/>
+        </Grid>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:SupplierPayDialogViewModel}">
+        <StackPanel>
+            <TextBlock Text="Amount" Style="{StaticResource Label}"/>
+            <TextBox Style="{StaticResource NumberBox}" Text="{Binding Amount, Converter={StaticResource Dec}}" FontSize="18" c:FocusBehavior.FocusOnLoad="True"/>
+            <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=Amount}" Style="{StaticResource FieldError}"/>
+            <Grid Margin="0,10,0,0">
+                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                <StackPanel><TextBlock Text="Paid by" Style="{StaticResource Label}"/><ComboBox ItemsSource="{Binding Methods}" SelectedItem="{Binding Method}"/></StackPanel>
+                <StackPanel Grid.Column="2"><TextBlock Text="Date" Style="{StaticResource Label}"/><DatePicker SelectedDate="{Binding Date}"/></StackPanel>
+            </Grid>
+            <TextBlock Text="Reference (UTR / cheque no)" Style="{StaticResource Label}" Margin="0,10,0,4"/>
+            <TextBox Text="{Binding Reference}"/>
+            <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=Reference}" Style="{StaticResource FieldError}"/>
+            <TextBlock Text="Notes" Style="{StaticResource Label}" Margin="0,10,0,4"/>
+            <TextBox Text="{Binding Notes}"/>
+            <TextBlock Style="{StaticResource Muted}" Margin="0,8,0,0" Text="The payment is applied to the oldest unpaid bills first (or to the selected purchase)."/>
+        </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:SupplierPaymentListViewModel}">
+        <Grid Margin="24,20">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource PageHeading}" Margin="0,0,0,14" Focusable="False"/>
+            <ContentControl Grid.Row="1" Content="{Binding}" ContentTemplate="{StaticResource ListToolbar}" Focusable="False"/>
+            <Border Grid.Row="2" Style="{StaticResource FlatCard}" Padding="0">
+                <Grid>
+                    <DataGrid ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" c:GridBehaviors.OpenCommand="{Binding OpenCommand}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Payment" Binding="{Binding Number}" Width="140" ElementStyle="{StaticResource BoldCell}"/>
+                            <DataGridTextColumn Header="Date" Binding="{Binding PaymentDate, Converter={StaticResource Date}}" Width="105"/>
+                            <DataGridTextColumn Header="Supplier" Binding="{Binding SupplierName}" Width="*"/>
+                            <DataGridTextColumn Header="Method" Binding="{Binding MethodCode, Converter={StaticResource StatusLabel}}" Width="100"/>
+                            <DataGridTextColumn Header="Reference" Binding="{Binding Reference}" Width="130"/>
+                            <DataGridTextColumn Header="Applied to" Binding="{Binding AppliedTo}" Width="160"/>
+                            <DataGridTextColumn Header="Amount" Binding="{Binding Amount, Converter={StaticResource Money}}" Width="120" ElementStyle="{StaticResource RightCell}"/>
+                            <DataGridTemplateColumn Width="100">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <c:StatusBadge Status="VOIDED" Visibility="{Binding IsVoided, Converter={StaticResource BoolToVis}}"/>
+                                            <Button Content="Void" MinHeight="28" Padding="10,0" Visibility="{Binding IsVoided, Converter={StaticResource BoolToVis}, ConverterParameter=invert}"
+                                                    Command="{Binding DataContext.VoidCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <c:EmptyState Title="No supplier payments" Message="{Binding EmptyMessage}" Icon="&#xE8C7;" Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}"/>
+                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Busy}" Focusable="False"/>
+                </Grid>
+            </Border>
+            <ContentControl Grid.Row="3" Content="{Binding}" ContentTemplate="{StaticResource ListPager}" Focusable="False"/>
+        </Grid>
+    </DataTemplate>
+</ResourceDictionary>

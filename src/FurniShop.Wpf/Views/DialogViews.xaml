@@ -1,0 +1,231 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="clr-namespace:FurniShop.Wpf.ViewModels"
+                    xmlns:c="clr-namespace:FurniShop.Wpf.Controls">
+
+    <!-- Confirm (optionally asks for a reason: cancel invoice, void payment…) -->
+    <DataTemplate DataType="{x:Type vm:ConfirmDialogViewModel}">
+        <StackPanel>
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" FontSize="14" LineHeight="21"/>
+            <StackPanel Margin="0,14,0,0" Visibility="{Binding RequireReason, Converter={StaticResource BoolToVis}}">
+                <TextBlock Text="Reason *" Style="{StaticResource Label}"/>
+                <TextBox Text="{Binding Reason, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MultilineBox}" MinHeight="60"
+                         c:FocusBehavior.FocusOnLoad="True" AutomationProperties.Name="Reason"/>
+                <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=Reason}" Style="{StaticResource FieldError}"/>
+            </StackPanel>
+        </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:ChangePasswordDialogViewModel}">
+        <StackPanel>
+            <TextBlock Text="{Binding Hint}" TextWrapping="Wrap" Style="{StaticResource Muted}" Margin="0,0,0,12"/>
+            <TextBlock Text="Current password" Style="{StaticResource Label}"/>
+            <PasswordBox c:PasswordHelper.BoundPassword="{Binding Current}" c:FocusBehavior.FocusOnLoad="True"/>
+            <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=Current}" Style="{StaticResource FieldError}"/>
+            <TextBlock Text="New password" Style="{StaticResource Label}" Margin="0,10,0,4"/>
+            <PasswordBox c:PasswordHelper.BoundPassword="{Binding NewPassword}"/>
+            <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=Password}" Style="{StaticResource FieldError}"/>
+            <TextBlock Text="Confirm new password" Style="{StaticResource Label}" Margin="0,10,0,4"/>
+            <PasswordBox c:PasswordHelper.BoundPassword="{Binding Confirm}"/>
+            <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=Confirm}" Style="{StaticResource FieldError}"/>
+        </StackPanel>
+    </DataTemplate>
+
+    <!-- Receive payment / finalise invoice / SO → invoice -->
+    <DataTemplate DataType="{x:Type vm:ReceivePaymentDialogViewModel}">
+        <StackPanel>
+            <Border Style="{StaticResource SoftPanel}" Margin="0,0,0,12" Visibility="{Binding TargetText, Converter={StaticResource NullToVis}}">
+                <TextBlock Text="{Binding TargetText}" TextWrapping="Wrap"/>
+            </Border>
+
+            <!-- customer -->
+            <StackPanel Visibility="{Binding IsDocumentAction, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+                <TextBlock Text="Customer *" Style="{StaticResource Label}"/>
+                <Grid Visibility="{Binding CanPickCustomer, Converter={StaticResource BoolToVis}}">
+                    <TextBox Text="{Binding CustomerSearch, UpdateSourceTrigger=PropertyChanged, Delay=300}" ToolTip="Search by name, mobile or code"
+                             AutomationProperties.Name="Search customer" c:FocusBehavior.FocusOnLoad="True"/>
+                </Grid>
+                <ListBox ItemsSource="{Binding Customers}" MaxHeight="150" Margin="0,4,0,0" ItemContainerStyle="{StaticResource PlainListItem}"
+                         Visibility="{Binding Customers.Count, Converter={StaticResource NullToVis}}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Button Style="{StaticResource GhostButton}" HorizontalContentAlignment="Left" HorizontalAlignment="Stretch"
+                                    Command="{Binding DataContext.PickCustomerCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" CommandParameter="{Binding}">
+                                <TextBlock><Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold"/>  <Run Text="{Binding Mobile, Mode=OneWay}" Foreground="{StaticResource TextMuted}"/></TextBlock>
+                            </Button>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=CustomerId}" Style="{StaticResource FieldError}"/>
+                <Border BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,6,0,0"
+                        Visibility="{Binding Customer, Converter={StaticResource NullToVis}}">
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Right" HorizontalAlignment="Right">
+                            <TextBlock Text="Outstanding" Style="{StaticResource Muted}" HorizontalAlignment="Right"/>
+                            <TextBlock Text="{Binding Outstanding, Converter={StaticResource Money}}" FontWeight="Bold" HorizontalAlignment="Right"
+                                       Foreground="{Binding Outstanding, Converter={StaticResource BalanceBrush}}"/>
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Text="{Binding Customer.Name}" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding Customer.Mobile}" Style="{StaticResource Muted}"/>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+                <ItemsControl ItemsSource="{Binding OpenInvoices}" Margin="0,8,0,0" Visibility="{Binding OpenInvoices.Count, Converter={StaticResource NullToVis}}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,2">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="130"/><ColumnDefinition Width="100"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding Number}" FontWeight="SemiBold"/>
+                                <TextBlock Grid.Column="1" Text="{Binding InvoiceDate, Converter={StaticResource Date}}" Style="{StaticResource Muted}"/>
+                                <c:StatusBadge Grid.Column="2" Status="{Binding PaymentState}"/>
+                                <TextBlock Grid.Column="3" Text="{Binding Balance, Converter={StaticResource Money}}" FontWeight="SemiBold"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="Payment date" Style="{StaticResource Label}" Margin="0,10,0,4"/>
+                <DatePicker SelectedDate="{Binding Date}" Width="160" HorizontalAlignment="Left"/>
+            </StackPanel>
+
+            <!-- tenders -->
+            <DockPanel Margin="0,12,0,4">
+                <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding Methods}">
+                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Content="{Binding Name}" ContentStringFormat="+ {0}" Style="{StaticResource LinkButton}" Margin="8,0,0,0"
+                                    Command="{Binding DataContext.AddMethodCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="Amount received" Style="{StaticResource Label}"/>
+            </DockPanel>
+            <ItemsControl ItemsSource="{Binding Entries}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:PaymentEntry}">
+                        <Grid Margin="0,3">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition/><ColumnDefinition Width="34"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding MethodLabel}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <TextBox Grid.Column="1" Style="{StaticResource NumberBox}" Text="{Binding Amount, Converter={StaticResource Dec}, UpdateSourceTrigger=PropertyChanged, Delay=300}"
+                                     AutomationProperties.Name="Amount"/>
+                            <TextBox Grid.Column="3" Text="{Binding Reference}" IsEnabled="{Binding NeedsReference}" ToolTip="UPI ref / card last 4 / cheque no"
+                                     AutomationProperties.Name="Reference"/>
+                            <Button Grid.Column="4" Style="{StaticResource IconButton}" Content="&#xE711;" FontSize="11" Width="30"
+                                    Command="{Binding DataContext.RemoveEntryCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
+                                    AutomationProperties.Name="Remove"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=Payments}" Style="{StaticResource FieldError}"/>
+            <DockPanel Margin="0,10,0,0">
+                <TextBlock DockPanel.Dock="Right" Text="{Binding Total, Converter={StaticResource Money}}" FontSize="18" FontWeight="Bold"/>
+                <TextBlock Text="Total" FontSize="15" VerticalAlignment="Center"/>
+            </DockPanel>
+            <StackPanel Visibility="{Binding IsDocumentAction, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+                <TextBlock Text="Notes" Style="{StaticResource Label}" Margin="0,10,0,4"/>
+                <TextBox Text="{Binding Notes}"/>
+                <CheckBox Content="Show the receipt to print afterwards" IsChecked="{Binding PrintReceipt}" Margin="0,10,0,0"/>
+            </StackPanel>
+        </StackPanel>
+    </DataTemplate>
+
+    <!-- Payment / refund receipt detail -->
+    <DataTemplate DataType="{x:Type vm:PaymentDetailDialogViewModel}">
+        <StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="{Binding Payment.CustomerName}" FontSize="15" FontWeight="SemiBold"/>
+                    <TextBlock Style="{StaticResource Muted}"><Run Text="{Binding Payment.PaymentDate, Converter={StaticResource Date}, Mode=OneWay}"/> · by <Run Text="{Binding Payment.CreatedByName, Mode=OneWay}"/></TextBlock>
+                </StackPanel>
+                <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                    <TextBlock Text="{Binding Payment.Amount, Converter={StaticResource Money}}" FontSize="22" FontWeight="Bold" HorizontalAlignment="Right"/>
+                    <c:StatusBadge Status="{Binding Payment.State}" HorizontalAlignment="Right"/>
+                </StackPanel>
+            </Grid>
+            <Border Style="{StaticResource SoftPanel}" Margin="0,12,0,0" Background="{StaticResource ErrorBg}"
+                    Visibility="{Binding Payment.IsVoided, Converter={StaticResource BoolToVis}}">
+                <TextBlock TextWrapping="Wrap" Foreground="{StaticResource ErrorFg}">
+                    <Run Text="Voided" FontWeight="Bold"/> <Run Text="{Binding Payment.VoidedAt, Converter={StaticResource Date}, ConverterParameter=time, Mode=OneWay}"/> — <Run Text="{Binding Payment.VoidReason, Mode=OneWay}"/>
+                </TextBlock>
+            </Border>
+            <TextBlock Text="Received by" Style="{StaticResource SectionTitle}" Margin="0,14,0,6"/>
+            <ItemsControl ItemsSource="{Binding Payment.Lines}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="0,2">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="100"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding MethodCode}" FontWeight="SemiBold"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Reference}" Style="{StaticResource Muted}"/>
+                            <TextBlock Grid.Column="2" Text="{Binding Amount, Converter={StaticResource Money}}"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="Applied to" Style="{StaticResource SectionTitle}" Margin="0,14,0,6"/>
+            <ItemsControl ItemsSource="{Binding Payment.Allocations}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="0,2">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding DocType, Converter={StaticResource StatusLabel}}"/>
+                            <TextBlock Grid.Column="1" Style="{StaticResource Muted}"><Run Text="{Binding DocNumber, Mode=OneWay}"/> <Run Text="{Binding Note, Mode=OneWay}"/></TextBlock>
+                            <TextBlock Grid.Column="2" Text="{Binding Amount, Converter={StaticResource Money}}"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="{Binding Payment.Notes}" TextWrapping="Wrap" Style="{StaticResource Muted}" Margin="0,10,0,0"
+                       Visibility="{Binding Payment.Notes, Converter={StaticResource NullToVis}}"/>
+            <WrapPanel Margin="0,20,0,0" HorizontalAlignment="Right">
+                <Button Content="Void" Style="{StaticResource DangerButton}" Command="{Binding VoidCommand}" Margin="0,0,16,0"
+                        Visibility="{Binding CanVoid, Converter={StaticResource BoolToVis}}"/>
+                <Button Content="WhatsApp" Command="{Binding WhatsAppCommand}" Margin="0,0,8,0"/>
+                <Button Content="PDF" Command="{Binding PdfCommand}" Margin="0,0,8,0"/>
+                <Button Content="Preview" Command="{Binding PreviewCommand}" Margin="0,0,8,0"/>
+                <Button Content="Print" Command="{Binding PrintCommand}" Margin="0,0,8,0"/>
+                <Button Content="Done" Style="{StaticResource PrimaryButton}" Command="{Binding DoneCommand}" IsDefault="True"/>
+            </WrapPanel>
+        </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:RefundDialogViewModel}">
+        <StackPanel>
+            <Border Style="{StaticResource SoftPanel}" Margin="0,0,0,12">
+                <TextBlock TextWrapping="Wrap">Money is paid back to the customer. Up to <Run Text="{Binding Max, Converter={StaticResource Money}, Mode=OneWay}" FontWeight="Bold"/> can be refunded.</TextBlock>
+            </Border>
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="Amount *" Style="{StaticResource Label}"/>
+                    <TextBox Style="{StaticResource NumberBox}" Text="{Binding Amount, Converter={StaticResource Dec}}" c:FocusBehavior.FocusOnLoad="True"/>
+                    <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=Amount}" Style="{StaticResource FieldError}"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                    <TextBlock Text="Paid by" Style="{StaticResource Label}"/>
+                    <ComboBox ItemsSource="{Binding Methods}" SelectedItem="{Binding Method}" DisplayMemberPath="Name"/>
+                </StackPanel>
+            </Grid>
+            <TextBlock Text="Reference" Style="{StaticResource Label}" Margin="0,10,0,4"/>
+            <TextBox Text="{Binding Reference}"/>
+            <TextBlock Text="Notes" Style="{StaticResource Label}" Margin="0,10,0,4"/>
+            <TextBox Text="{Binding Notes}"/>
+        </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:WhatsAppDialogViewModel}">
+        <StackPanel>
+            <TextBlock Text="Mobile number" Style="{StaticResource Label}"/>
+            <TextBox Text="{Binding Mobile}" MaxLength="15"/>
+            <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=Mobile}" Style="{StaticResource FieldError}"/>
+            <TextBlock Text="Message" Style="{StaticResource Label}" Margin="0,10,0,4"/>
+            <TextBox Text="{Binding Message}" Style="{StaticResource MultilineBox}" MinHeight="170"/>
+            <CheckBox Content="Also save the PDF and open its folder so I can attach it" IsChecked="{Binding AttachPdf}" Margin="0,10,0,0"
+                      Visibility="{Binding HasAttachment, Converter={StaticResource BoolToVis}}"/>
+            <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,10,0,0"
+                       Text="WhatsApp opens with this message ready; press Send there. Nothing is sent automatically."/>
+        </StackPanel>
+    </DataTemplate>
+</ResourceDictionary>

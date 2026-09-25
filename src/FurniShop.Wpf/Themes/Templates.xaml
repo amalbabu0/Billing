@@ -2,5 +2,14 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="/FurniShop;component/Controls/ListChrome.xaml"/>
+        <ResourceDictionary Source="/FurniShop;component/Views/DashboardViews.xaml"/>
+        <ResourceDictionary Source="/FurniShop;component/Views/PosViews.xaml"/>
+        <ResourceDictionary Source="/FurniShop;component/Views/SalesViews.xaml"/>
+        <ResourceDictionary Source="/FurniShop;component/Views/CustomerViews.xaml"/>
+        <ResourceDictionary Source="/FurniShop;component/Views/ProductViews.xaml"/>
+        <ResourceDictionary Source="/FurniShop;component/Views/PurchaseViews.xaml"/>
+        <ResourceDictionary Source="/FurniShop;component/Views/OperationsViews.xaml"/>
+        <ResourceDictionary Source="/FurniShop;component/Views/AdminViews.xaml"/>
+        <ResourceDictionary Source="/FurniShop;component/Views/DialogViews.xaml"/>
     </ResourceDictionary.MergedDictionaries>
 </ResourceDictionary>

@@ -1,0 +1,235 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="clr-namespace:FurniShop.Wpf.ViewModels"
+                    xmlns:c="clr-namespace:FurniShop.Wpf.Controls">
+
+    <Style x:Key="ChartCard" TargetType="Border" BasedOn="{StaticResource FlatCard}">
+        <Setter Property="Margin" Value="0,0,12,12"/>
+        <Setter Property="Height" Value="310"/>
+    </Style>
+
+    <DataTemplate DataType="{x:Type vm:DashboardViewModel}">
+        <Grid>
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="24,20,12,24">
+                    <!-- header -->
+                    <DockPanel Margin="0,0,12,18">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Content="Refresh" Command="{Binding RefreshCommand}" Margin="0,0,8,0"/>
+                            <Button Content="Profit report" Command="{Binding GoCommand}" CommandParameter="profit" Margin="0,0,8,0"
+                                    Visibility="{Binding CanSeeCost, Converter={StaticResource BoolToVis}}"/>
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Text="{Binding Greeting}" Style="{StaticResource PageTitle}"/>
+                            <TextBlock Text="{Binding Subtitle}" Style="{StaticResource PageSubtitle}"/>
+                        </StackPanel>
+                    </DockPanel>
+
+                    <!-- KPI tiles -->
+                    <c:ResponsiveTiles MinTileWidth="235">
+                        <c:KpiCard Title="Today's sales" Value="{Binding Data.TodaySales, Converter={StaticResource Money}, ConverterParameter=compact}"
+                                   Note="{Binding Data.TodayInvoices, StringFormat={}{0} invoices today}" Icon="&#xE7BF;">
+                            <c:KpiCard.InputBindings><MouseBinding MouseAction="LeftClick" Command="{Binding GoCommand}" CommandParameter="invoices"/></c:KpiCard.InputBindings>
+                        </c:KpiCard>
+                        <c:KpiCard Title="Today's collections" Value="{Binding Data.TodayCollections, Converter={StaticResource Money}, ConverterParameter=compact}"
+                                   Note="Cash, UPI, card, bank, cheque" Icon="&#xE8C7;" Tone="SUCCESS">
+                            <c:KpiCard.InputBindings><MouseBinding MouseAction="LeftClick" Command="{Binding GoCommand}" CommandParameter="payments"/></c:KpiCard.InputBindings>
+                        </c:KpiCard>
+                        <c:KpiCard Title="Total outstanding" Value="{Binding Data.TotalOutstanding, Converter={StaticResource Money}, ConverterParameter=compact}"
+                                   Note="{Binding Data.PendingPaymentInvoices, StringFormat={}{0} invoices with balance due}" Icon="&#xE7BA;" Tone="WARNING">
+                            <c:KpiCard.InputBindings><MouseBinding MouseAction="LeftClick" Command="{Binding GoCommand}" CommandParameter="outstanding"/></c:KpiCard.InputBindings>
+                        </c:KpiCard>
+                        <c:KpiCard Title="Overdue" Value="{Binding Data.OverdueAmount, Converter={StaticResource Money}, ConverterParameter=compact}"
+                                   Note="Past due date — send reminders" Icon="&#xE783;" Tone="ERROR">
+                            <c:KpiCard.InputBindings><MouseBinding MouseAction="LeftClick" Command="{Binding GoCommand}" CommandParameter="overdue"/></c:KpiCard.InputBindings>
+                        </c:KpiCard>
+                        <c:KpiCard Title="Advance payments held" Value="{Binding Data.AdvancesHeld, Converter={StaticResource Money}, ConverterParameter=compact}"
+                                   Note="{Binding Data.OpenSalesOrders, StringFormat={}{0} open sales orders}" Icon="&#xE8C7;" Tone="INFO">
+                            <c:KpiCard.InputBindings><MouseBinding MouseAction="LeftClick" Command="{Binding GoCommand}" CommandParameter="orders"/></c:KpiCard.InputBindings>
+                        </c:KpiCard>
+                        <c:KpiCard Title="Pending deliveries" Value="{Binding Data.PendingDeliveries}"
+                                   Note="{Binding Data.TodayDeliveries, StringFormat={}{0} scheduled for today}" Icon="&#xE804;" Tone="INFO">
+                            <c:KpiCard.InputBindings><MouseBinding MouseAction="LeftClick" Command="{Binding GoCommand}" CommandParameter="deliveries"/></c:KpiCard.InputBindings>
+                        </c:KpiCard>
+                        <c:KpiCard Title="Custom orders in progress" Value="{Binding Data.PendingCustomOrders}"
+                                   Note="{Binding Data.OverdueCustomOrders, StringFormat={}{0} past promised date}" Icon="&#xE90F;">
+                            <c:KpiCard.InputBindings><MouseBinding MouseAction="LeftClick" Command="{Binding GoCommand}" CommandParameter="custom"/></c:KpiCard.InputBindings>
+                        </c:KpiCard>
+                        <c:KpiCard Title="Low stock" Value="{Binding Data.LowStockCount}" Note="At or below minimum" Icon="&#xE7B8;" Tone="WARNING">
+                            <c:KpiCard.InputBindings><MouseBinding MouseAction="LeftClick" Command="{Binding GoCommand}" CommandParameter="low"/></c:KpiCard.InputBindings>
+                        </c:KpiCard>
+                        <c:KpiCard Title="Out of stock" Value="{Binding Data.OutOfStockCount}" Note="Nothing available to sell" Icon="&#xE7BA;" Tone="ERROR">
+                            <c:KpiCard.InputBindings><MouseBinding MouseAction="LeftClick" Command="{Binding GoCommand}" CommandParameter="out"/></c:KpiCard.InputBindings>
+                        </c:KpiCard>
+                        <c:KpiCard Title="Reserved stock" Value="{Binding Data.ReservedUnits, Converter={StaticResource Qty}}" Note="Units held for orders" Icon="&#xE72E;">
+                            <c:KpiCard.InputBindings><MouseBinding MouseAction="LeftClick" Command="{Binding GoCommand}" CommandParameter="reserved"/></c:KpiCard.InputBindings>
+                        </c:KpiCard>
+                        <c:KpiCard Title="Sales this month" Value="{Binding Data.MonthSales, Converter={StaticResource Money}, ConverterParameter=compact}"
+                                   Note="{Binding MonthChange}" Icon="&#xE9D2;" Tone="SUCCESS"/>
+                        <c:KpiCard Title="Net profit this month" Value="{Binding Data.MonthNetProfit, Converter={StaticResource Money}, ConverterParameter=compact}"
+                                   Note="{Binding Data.MonthGrossProfit, Converter={StaticResource Money}, ConverterParameter=compact, StringFormat='Gross profit {0}'}"
+                                   Icon="&#xE9D2;" Tone="SUCCESS" Visibility="{Binding CanSeeCost, Converter={StaticResource BoolToVis}}">
+                            <c:KpiCard.InputBindings><MouseBinding MouseAction="LeftClick" Command="{Binding GoCommand}" CommandParameter="profit"/></c:KpiCard.InputBindings>
+                        </c:KpiCard>
+                    </c:ResponsiveTiles>
+
+                    <!-- Sales over time (full width) -->
+                    <Border Style="{StaticResource ChartCard}" Height="300">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="Sales — last 30 days" Style="{StaticResource SectionTitle}"/>
+                            <c:Chart Kind="Area" ItemsSource="{Binding Data.SalesLast30Days}" AutomationProperties.Name="Sales over the last 30 days"/>
+                        </DockPanel>
+                    </Border>
+
+                    <c:ResponsiveTiles MinTileWidth="400">
+                        <Border Style="{StaticResource ChartCard}">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Top" Text="Monthly revenue" Style="{StaticResource SectionTitle}"/>
+                                <c:Chart Kind="Column" ItemsSource="{Binding Data.MonthlyRevenue}"/>
+                            </DockPanel>
+                        </Border>
+                        <Border Style="{StaticResource ChartCard}" Visibility="{Binding CanSeeCost, Converter={StaticResource BoolToVis}}">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Top" Text="Monthly net profit (after expenses)" Style="{StaticResource SectionTitle}"/>
+                                <c:Chart Kind="Column" SeriesColor="#1BAF7A" ItemsSource="{Binding Data.MonthlyProfit}"/>
+                            </DockPanel>
+                        </Border>
+                        <Border Style="{StaticResource ChartCard}">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Top" Text="Sales by category (90 days)" Style="{StaticResource SectionTitle}"/>
+                                <c:Chart Kind="Donut" ItemsSource="{Binding Data.SalesByCategory}"/>
+                            </DockPanel>
+                        </Border>
+                        <Border Style="{StaticResource ChartCard}">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Top" Text="Collections by payment method (this month)" Style="{StaticResource SectionTitle}"/>
+                                <c:Chart Kind="Donut" ItemsSource="{Binding Data.PaymentMethods}"/>
+                            </DockPanel>
+                        </Border>
+                        <Border Style="{StaticResource ChartCard}">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Top" Text="Top-selling products (units, 90 days)" Style="{StaticResource SectionTitle}"/>
+                                <c:Chart Kind="HorizontalBar" IsMoney="False" ItemsSource="{Binding Data.TopProducts}"/>
+                            </DockPanel>
+                        </Border>
+                        <!-- Low stock -->
+                        <Border Style="{StaticResource ChartCard}">
+                            <DockPanel>
+                                <DockPanel DockPanel.Dock="Top">
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="View all" Command="{Binding GoCommand}" CommandParameter="low"/>
+                                    <TextBlock Text="Low / out of stock" Style="{StaticResource SectionTitle}"/>
+                                </DockPanel>
+                                <Grid>
+                                    <c:EmptyState Title="Stock levels are healthy" Icon="&#xE73E;" Margin="0"
+                                                  Visibility="{Binding Data.LowStock.Count, Converter={StaticResource NullToVis}, ConverterParameter=invert}"/>
+                                    <ItemsControl ItemsSource="{Binding Data.LowStock}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <DockPanel Margin="0,5">
+                                                    <c:StatusBadge DockPanel.Dock="Right" Status="{Binding StockState}"/>
+                                                    <TextBlock DockPanel.Dock="Right" Margin="0,0,10,0" VerticalAlignment="Center" Foreground="{StaticResource TextSecondary}">
+                                                        <Run Text="{Binding Available, Converter={StaticResource Qty}, Mode=OneWay}"/> <Run Text="left"/>
+                                                    </TextBlock>
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Text="{Binding Sku}" Style="{StaticResource Muted}"/>
+                                                    </StackPanel>
+                                                </DockPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
+                            </DockPanel>
+                        </Border>
+                    </c:ResponsiveTiles>
+
+                    <!-- Recent activity -->
+                    <c:ResponsiveTiles MinTileWidth="400">
+                        <Border Style="{StaticResource FlatCard}" Margin="0,0,12,12" Visibility="{Binding Data.RecentInvoices.Count, Converter={StaticResource NullToVis}}">
+                            <StackPanel>
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="All invoices" Command="{Binding GoCommand}" CommandParameter="invoices"/>
+                                    <TextBlock Text="Recent invoices" Style="{StaticResource SectionTitle}"/>
+                                </DockPanel>
+                                <ItemsControl ItemsSource="{Binding Data.RecentInvoices}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Style="{StaticResource GhostButton}" HorizontalContentAlignment="Stretch" Padding="6,4" Margin="0,1"
+                                                    Command="{Binding DataContext.OpenInvoiceCommand, RelativeSource={RelativeSource AncestorType=ScrollViewer}}" CommandParameter="{Binding}">
+                                                <DockPanel>
+                                                    <c:StatusBadge DockPanel.Dock="Right" Status="{Binding PaymentState}" Margin="10,0,0,0"/>
+                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding GrandTotal, Converter={StaticResource Money}}" FontWeight="SemiBold"
+                                                               Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                                    <StackPanel HorizontalAlignment="Left">
+                                                        <TextBlock Text="{Binding DisplayNumber}" Foreground="{StaticResource TextPrimary}"/>
+                                                        <TextBlock Style="{StaticResource Muted}" FontWeight="Normal">
+                                                            <Run Text="{Binding CustomerName, Mode=OneWay}"/> · <Run Text="{Binding InvoiceDate, Converter={StaticResource Date}, Mode=OneWay}"/>
+                                                        </TextBlock>
+                                                    </StackPanel>
+                                                </DockPanel>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource FlatCard}" Margin="0,0,12,12" Visibility="{Binding Data.RecentPayments.Count, Converter={StaticResource NullToVis}}">
+                            <StackPanel>
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="All payments" Command="{Binding GoCommand}" CommandParameter="payments"/>
+                                    <TextBlock Text="Recent payments" Style="{StaticResource SectionTitle}"/>
+                                </DockPanel>
+                                <ItemsControl ItemsSource="{Binding Data.RecentPayments}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Style="{StaticResource GhostButton}" HorizontalContentAlignment="Stretch" Padding="6,4" Margin="0,1"
+                                                    Command="{Binding DataContext.OpenPaymentCommand, RelativeSource={RelativeSource AncestorType=ScrollViewer}}" CommandParameter="{Binding}">
+                                                <DockPanel>
+                                                    <c:StatusBadge DockPanel.Dock="Right" Status="{Binding State}" Margin="10,0,0,0"/>
+                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding Amount, Converter={StaticResource Money}}" FontWeight="SemiBold"
+                                                               Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                                    <StackPanel HorizontalAlignment="Left">
+                                                        <TextBlock Text="{Binding CustomerName}" Foreground="{StaticResource TextPrimary}"/>
+                                                        <TextBlock Style="{StaticResource Muted}" FontWeight="Normal">
+                                                            <Run Text="{Binding Number, Mode=OneWay}"/> · <Run Text="{Binding Methods, Mode=OneWay}"/>
+                                                        </TextBlock>
+                                                    </StackPanel>
+                                                </DockPanel>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource FlatCard}" Margin="0,0,12,12" Visibility="{Binding Data.RecentCustomers.Count, Converter={StaticResource NullToVis}}">
+                            <StackPanel>
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="All customers" Command="{Binding GoCommand}" CommandParameter="customers"/>
+                                    <TextBlock Text="New customers" Style="{StaticResource SectionTitle}"/>
+                                </DockPanel>
+                                <ItemsControl ItemsSource="{Binding Data.RecentCustomers}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Style="{StaticResource GhostButton}" HorizontalContentAlignment="Stretch" Padding="6,4" Margin="0,1"
+                                                    Command="{Binding DataContext.OpenCustomerCommand, RelativeSource={RelativeSource AncestorType=ScrollViewer}}" CommandParameter="{Binding}">
+                                                <DockPanel>
+                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding CreatedAt, Converter={StaticResource Date}}" Style="{StaticResource Muted}" VerticalAlignment="Center"/>
+                                                    <StackPanel HorizontalAlignment="Left">
+                                                        <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextPrimary}"/>
+                                                        <TextBlock Text="{Binding Mobile}" Style="{StaticResource Muted}" FontWeight="Normal"/>
+                                                    </StackPanel>
+                                                </DockPanel>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </c:ResponsiveTiles>
+                </StackPanel>
+            </ScrollViewer>
+            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Busy}" Focusable="False"
+                            Visibility="{Binding Data, Converter={StaticResource NullToVis}, ConverterParameter=invert}"/>
+        </Grid>
+    </DataTemplate>
+</ResourceDictionary>

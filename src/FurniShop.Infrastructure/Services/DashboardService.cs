@@ -203,7 +203,7 @@ public sealed class SearchService(Db db, UserSession session)
     }
 }
 
-public sealed class NotificationService(Db db, UserSession session)
+public sealed class NotificationService(Db db, UserSession session, SettingsService settings)
 {
     public Task<IReadOnlyList<Notification>> UnreadAsync(int limit = 30) =>
         db.QueryAsync<Notification>("""
@@ -228,5 +228,22 @@ public sealed class NotificationService(Db db, UserSession session)
             from custom_orders o where o.status not in ('COMPLETED','CANCELLED') and o.expected_completion_date < current_date
               and not exists (select 1 from notifications n where n.ref_type = 'CUSTOM_ORDER' and n.ref_id = o.id and n.created_at::date = current_date);
             """);
+
+        // Backup reminder for users who can take backups, at most once a day.
+        var backup = (await settings.GetAsync(refresh: true)).Backup;
+        if (backup.ReminderDays > 0 && (backup.LastBackupAt is null || backup.LastBackupAt.Value.Date.AddDays(backup.ReminderDays) <= DateTime.Today))
+        {
+            var message = backup.LastBackupAt is { } at
+                ? $"The last backup was taken on {at:dd-MMM-yyyy}. Take a backup or data export from Settings → Backup."
+                : "No backup has been taken yet. Take a backup or data export from Settings → Backup.";
+            await db.ExecuteAsync("""
+                insert into notifications (user_id, kind, title, message)
+                select u.id, 'BACKUP', 'Backup reminder', @message
+                from users u
+                where u.is_active and not u.is_deleted
+                  and exists (select 1 from role_permissions rp where rp.role_id = u.role_id and rp.permission_code = @perm)
+                  and not exists (select 1 from notifications n where n.user_id = u.id and n.kind = 'BACKUP' and n.created_at::date = current_date)
+                """, new { message, perm = Perm.BackupManage });
+        }
     }
 }

@@ -362,6 +362,7 @@ public sealed partial class ShellViewModel : ObservableObject
             case "INVOICE" when n.RefId.HasValue: Navigate(Routes.Invoice, n.RefId.Value); break;
             case "CUSTOM_ORDER" when n.RefId.HasValue: Navigate(Routes.CustomOrderDetail, n.RefId.Value); break;
             case "VARIANT": Navigate(Routes.Stock, "LOW"); break;
+            case null when n.Kind == "BACKUP": Navigate(Routes.Settings, "backup"); break;
         }
     }
 

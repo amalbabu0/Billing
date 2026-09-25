@@ -157,7 +157,7 @@ public sealed class EmptyState : StackPanel
     public string? Icon { get => (string?)GetValue(IconProperty); set => SetValue(IconProperty, value); }
 }
 
-/// <summary>Signature capture for proof of delivery; exports a PNG.</summary>
+/// <summary>Signature capture for proof of delivery; exports a PNG. Hooks itself to the delivery dialog view model.</summary>
 public sealed class SignaturePad : Border
 {
     private readonly InkCanvas _ink = new() { Background = Brushes.White };
@@ -170,7 +170,15 @@ public sealed class SignaturePad : Border
         Height = 150;
         ClipToBounds = true;
         _ink.DefaultDrawingAttributes = new DrawingAttributes { Color = Colors.Black, Width = 2.2, Height = 2.2, FitToCurve = true };
-        Child = _ink;
+        var clear = new Button { Content = "Clear", HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(6), MinHeight = 26, Padding = new Thickness(8, 0, 8, 0) };
+        clear.Click += (_, _) => Clear();
+        var hint = new TextBlock { Text = "Customer signs here", Foreground = Res.B("TextMuted"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 8), IsHitTestVisible = false };
+        Child = new Grid { Children = { _ink, hint, clear } };
+        System.Windows.Automation.AutomationProperties.SetName(this, "Signature pad");
+        DataContextChanged += (_, e) =>
+        {
+            if (e.NewValue is ViewModels.CompleteDeliveryDialogViewModel vm) vm.SignatureProvider = ToPng;
+        };
     }
 
     public bool IsEmpty => _ink.Strokes.Count == 0;

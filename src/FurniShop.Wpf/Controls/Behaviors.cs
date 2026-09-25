@@ -139,3 +139,35 @@ public sealed class ResponsiveTiles : Panel
         return final;
     }
 }
+
+/// <summary>Keyboard helpers: focus an element on load, or when a shortcut key is pressed anywhere in the window.</summary>
+public static class FocusBehavior
+{
+    public static readonly DependencyProperty FocusOnLoadProperty = DependencyProperty.RegisterAttached("FocusOnLoad", typeof(bool), typeof(FocusBehavior),
+        new PropertyMetadata(false, (d, e) =>
+        {
+            if (d is FrameworkElement fe && e.NewValue is true)
+                fe.Loaded += (_, _) => fe.Dispatcher.BeginInvoke(() => Keyboard.Focus(fe), System.Windows.Threading.DispatcherPriority.Input);
+        }));
+
+    public static bool GetFocusOnLoad(DependencyObject o) => (bool)o.GetValue(FocusOnLoadProperty);
+    public static void SetFocusOnLoad(DependencyObject o, bool v) => o.SetValue(FocusOnLoadProperty, v);
+
+    public static readonly DependencyProperty ShortcutProperty = DependencyProperty.RegisterAttached("Shortcut", typeof(Key), typeof(FocusBehavior),
+        new PropertyMetadata(Key.None, (d, e) =>
+        {
+            if (d is not FrameworkElement fe || e.NewValue is not Key key || key == Key.None) return;
+            KeyEventHandler handler = (_, args) =>
+            {
+                if (args.Key != key || !fe.IsVisible) return;
+                Keyboard.Focus(fe);
+                if (fe is TextBox tb) tb.SelectAll();
+                args.Handled = true;
+            };
+            fe.Loaded += (_, _) => { if (Window.GetWindow(fe) is { } w) w.PreviewKeyDown += handler; };
+            fe.Unloaded += (_, _) => { if (Window.GetWindow(fe) is { } w) w.PreviewKeyDown -= handler; };
+        }));
+
+    public static Key GetShortcut(DependencyObject o) => (Key)o.GetValue(ShortcutProperty);
+    public static void SetShortcut(DependencyObject o, Key v) => o.SetValue(ShortcutProperty, v);
+}

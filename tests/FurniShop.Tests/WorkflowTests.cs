@@ -40,6 +40,15 @@ public class BillingWorkflowTests(DbFixture f) : IClassFixture<DbFixture>
     }
 
     [DbFact]
+    public async Task Backup_reminder_is_raised_once_a_day_for_backup_admins()
+    {
+        await f.App.Notifications.GenerateDailyAsync();
+        await f.App.Notifications.GenerateDailyAsync();
+        var backups = (await f.App.Notifications.UnreadAsync(100)).Where(n => n.Kind == "BACKUP").ToList();
+        Assert.Single(backups);
+    }
+
+    [DbFact]
     public async Task Credit_sale_needs_a_real_customer()
     {
         var v = await f.ProductAsync(Code("CHR"), 4200, 2600, 10);

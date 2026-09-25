@@ -1,0 +1,568 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="clr-namespace:FurniShop.Wpf.ViewModels"
+                    xmlns:c="clr-namespace:FurniShop.Wpf.Controls">
+
+    <!-- =================================================================== Products -->
+    <DataTemplate DataType="{x:Type vm:ProductListViewModel}">
+        <Grid Margin="24,20">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <DockPanel Margin="0,0,0,14">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                    <ComboBox ItemsSource="{Binding Categories}" SelectedItem="{Binding Category}" DisplayMemberPath="Name" Width="190" Margin="0,0,10,0" AutomationProperties.Name="Category"/>
+                    <Button Style="{StaticResource PrimaryButton}" Content="+ New product" Command="{Binding NewCommand}" Visibility="{Binding CanCreate, Converter={StaticResource BoolToVis}}"/>
+                </StackPanel>
+                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource PageHeading}" Focusable="False"/>
+            </DockPanel>
+            <ContentControl Grid.Row="1" Content="{Binding}" ContentTemplate="{StaticResource ListToolbar}" Focusable="False"/>
+            <Border Grid.Row="2" Style="{StaticResource FlatCard}" Padding="0">
+                <Grid>
+                    <c:AdaptiveList>
+                        <DataGrid ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" c:GridBehaviors.ServerSort="True" c:GridBehaviors.OpenCommand="{Binding OpenCommand}"
+                                  AutomationProperties.Name="Products">
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Header="Product" SortMemberPath="name" Width="*">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Style="{StaticResource Muted}"><Run Text="{Binding Code, Mode=OneWay}"/> · <Run Text="{Binding VariantCount, Mode=OneWay}"/> variant(s) · <Run Text="{Binding Material, Mode=OneWay}"/></TextBlock>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="Category" Binding="{Binding CategoryName}" SortMemberPath="category" Width="130"/>
+                                <DataGridTextColumn Header="Brand" Binding="{Binding BrandName}" Width="120"/>
+                                <DataGridTextColumn Header="HSN" Binding="{Binding HsnCode}" Width="80"/>
+                                <DataGridTextColumn Header="GST" Binding="{Binding GstRate, StringFormat={}{0:0.##}%}" Width="60"/>
+                                <DataGridTextColumn Header="Price" Binding="{Binding SellingPrice, Converter={StaticResource Money}}" SortMemberPath="price" Width="115" ElementStyle="{StaticResource RightCell}"/>
+                                <DataGridTextColumn Header="Cost" Binding="{Binding CostPrice, Converter={StaticResource Money}, ConverterParameter=dash}" Width="110" ElementStyle="{StaticResource RightCell}"
+                                                    Visibility="Visible"/>
+                                <DataGridTextColumn Header="On hand" Binding="{Binding OnHand, Converter={StaticResource Qty}}" SortMemberPath="stock" Width="80" ElementStyle="{StaticResource RightCell}"/>
+                                <DataGridTextColumn Header="Available" Binding="{Binding Available, Converter={StaticResource Qty}}" Width="80" ElementStyle="{StaticResource RightCell}"/>
+                                <DataGridTemplateColumn Header="Status" Width="120"><DataGridTemplateColumn.CellTemplate><DataTemplate><c:StatusBadge Status="{Binding Status}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <ListBox ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" c:GridBehaviors.OpenCommand="{Binding OpenCommand}" BorderThickness="0" ItemContainerStyle="{StaticResource PlainListItem}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1" Padding="14,10">
+                                        <DockPanel>
+                                            <StackPanel DockPanel.Dock="Right"><TextBlock Text="{Binding SellingPrice, Converter={StaticResource Money}}" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+                                                <TextBlock Style="{StaticResource Muted}" HorizontalAlignment="Right"><Run Text="{Binding Available, Converter={StaticResource Qty}, Mode=OneWay}"/> available</TextBlock></StackPanel>
+                                            <StackPanel><TextBlock Text="{Binding Name}" FontWeight="SemiBold"/><TextBlock Style="{StaticResource Muted}"><Run Text="{Binding Code, Mode=OneWay}"/> · <Run Text="{Binding CategoryName, Mode=OneWay}"/></TextBlock></StackPanel>
+                                        </DockPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </c:AdaptiveList>
+                    <c:EmptyState Title="No products" Message="{Binding EmptyMessage}" Icon="&#xE8F1;" Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}"/>
+                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Busy}" Focusable="False"/>
+                </Grid>
+            </Border>
+            <ContentControl Grid.Row="3" Content="{Binding}" ContentTemplate="{StaticResource ListPager}" Focusable="False"/>
+        </Grid>
+    </DataTemplate>
+
+    <!-- =================================================================== Product editor -->
+    <DataTemplate DataType="{x:Type vm:ProductEditorViewModel}">
+        <Grid>
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="24,20">
+                    <DockPanel Margin="0,0,0,14">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                            <Button Content="Print labels" Command="{Binding PrintLabelsCommand}" Margin="0,0,8,0" Visibility="{Binding IsNew, Converter={StaticResource BoolToVis}, ConverterParameter=invert}"/>
+                            <Button Content="Delete" Command="{Binding DeleteCommand}" Style="{StaticResource DangerButton}" Margin="0,0,8,0" Visibility="{Binding CanDelete, Converter={StaticResource BoolToVis}}"/>
+                            <Button Content="Save product" Command="{Binding SaveCommand}" Style="{StaticResource PrimaryButton}" MinWidth="130" Visibility="{Binding CanEdit, Converter={StaticResource BoolToVis}}"/>
+                        </StackPanel>
+                        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource PageHeading}" Focusable="False"/>
+                    </DockPanel>
+                    <TextBlock Text="{Binding ErrorMessage}" Style="{StaticResource FieldError}" Margin="0,0,0,10"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <Border Style="{StaticResource FlatCard}" Margin="0,0,12,12">
+                                <StackPanel>
+                                    <TextBlock Text="Basic details" Style="{StaticResource SectionTitle}"/>
+                                    <WrapPanel>
+                                        <StackPanel Width="340" Margin="0,0,12,10"><TextBlock Text="Product name *" Style="{StaticResource Label}"/><TextBox Text="{Binding Name}"/>
+                                            <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=Name}" Style="{StaticResource FieldError}"/></StackPanel>
+                                        <StackPanel Width="170" Margin="0,0,12,10"><TextBlock Text="Code / SKU *" Style="{StaticResource Label}"/><TextBox Text="{Binding Code}" CharacterCasing="Upper"/>
+                                            <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=Code}" Style="{StaticResource FieldError}"/></StackPanel>
+                                        <StackPanel Width="200" Margin="0,0,12,10"><TextBlock Text="Category *" Style="{StaticResource Label}"/>
+                                            <ComboBox ItemsSource="{Binding Categories}" SelectedItem="{Binding Category}" DisplayMemberPath="Name"/>
+                                            <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=CategoryId}" Style="{StaticResource FieldError}"/></StackPanel>
+                                        <StackPanel Width="170" Margin="0,0,12,10"><TextBlock Text="Brand" Style="{StaticResource Label}"/>
+                                            <ComboBox ItemsSource="{Binding Brands}" SelectedItem="{Binding Brand}" DisplayMemberPath="Name"/></StackPanel>
+                                        <StackPanel Width="160" Margin="0,0,12,10"><TextBlock Text="Status" Style="{StaticResource Label}"/>
+                                            <ComboBox ItemsSource="{Binding Statuses}" SelectedItem="{Binding Status}"/></StackPanel>
+                                    </WrapPanel>
+                                    <WrapPanel>
+                                        <StackPanel Width="170" Margin="0,0,12,10"><TextBlock Text="Material" Style="{StaticResource Label}"/><TextBox Text="{Binding Material}"/></StackPanel>
+                                        <StackPanel Width="150" Margin="0,0,12,10"><TextBlock Text="Colour" Style="{StaticResource Label}"/><TextBox Text="{Binding Color}"/></StackPanel>
+                                        <StackPanel Width="150" Margin="0,0,12,10"><TextBlock Text="Finish" Style="{StaticResource Label}"/><TextBox Text="{Binding Finish}"/></StackPanel>
+                                        <StackPanel Width="150" Margin="0,0,12,10"><TextBlock Text="Fabric" Style="{StaticResource Label}"/><TextBox Text="{Binding Fabric}"/></StackPanel>
+                                        <StackPanel Width="130" Margin="0,0,12,10"><TextBlock Text="Size" Style="{StaticResource Label}"/><TextBox Text="{Binding Size}"/></StackPanel>
+                                        <StackPanel Width="170" Margin="0,0,12,10"><TextBlock Text="Dimensions (L × W × H)" Style="{StaticResource Label}"/><TextBox Text="{Binding Dimensions}"/></StackPanel>
+                                        <StackPanel Width="110" Margin="0,0,12,10"><TextBlock Text="Weight (kg)" Style="{StaticResource Label}"/><TextBox Style="{StaticResource NumberBox}" Text="{Binding WeightKg, Converter={StaticResource Dec}}"/></StackPanel>
+                                        <StackPanel Width="130" Margin="0,0,12,10"><TextBlock Text="Warranty (months)" Style="{StaticResource Label}"/><TextBox Style="{StaticResource NumberBox}" Text="{Binding WarrantyMonths}"/></StackPanel>
+                                    </WrapPanel>
+                                    <TextBlock Text="Description" Style="{StaticResource Label}"/>
+                                    <TextBox Text="{Binding Description}" Style="{StaticResource MultilineBox}"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource FlatCard}" Margin="0,0,12,12">
+                                <StackPanel>
+                                    <TextBlock Text="Price &amp; tax" Style="{StaticResource SectionTitle}"/>
+                                    <WrapPanel>
+                                        <StackPanel Width="150" Margin="0,0,12,10"><TextBlock Text="Selling price (MRP) *" Style="{StaticResource Label}"/><TextBox Style="{StaticResource NumberBox}" Text="{Binding SellingPrice, Converter={StaticResource Dec}}"/></StackPanel>
+                                        <StackPanel Width="150" Margin="0,0,12,10"><TextBlock Text="Price includes GST" Style="{StaticResource Label}"/><CheckBox IsChecked="{Binding PriceIncludesGst}" Content="Yes (inclusive)"/></StackPanel>
+                                        <StackPanel Width="150" Margin="0,0,12,10" Visibility="{Binding CanSeeCost, Converter={StaticResource BoolToVis}}"><TextBlock Text="Cost price (ex-GST)" Style="{StaticResource Label}"/><TextBox Style="{StaticResource NumberBox}" Text="{Binding CostPrice, Converter={StaticResource Dec}}"/></StackPanel>
+                                        <StackPanel Width="150" Margin="0,0,12,10"><TextBlock Text="Max staff discount %" Style="{StaticResource Label}"/><TextBox Style="{StaticResource NumberBox}" Text="{Binding DiscountPercent, Converter={StaticResource Dec}}"/></StackPanel>
+                                        <StackPanel Width="150" Margin="0,0,12,10"><TextBlock Text="HSN code" Style="{StaticResource Label}"/>
+                                            <ComboBox ItemsSource="{Binding HsnCodes}" IsEditable="True" Text="{Binding HsnCode, UpdateSourceTrigger=LostFocus}" DisplayMemberPath="Code" TextSearch.TextPath="Code"/></StackPanel>
+                                        <StackPanel Width="110" Margin="0,0,12,10"><TextBlock Text="GST rate" Style="{StaticResource Label}"/>
+                                            <ComboBox ItemsSource="{Binding GstRates}" SelectedItem="{Binding GstRate}" ItemStringFormat="{}{0:0.##}%"/></StackPanel>
+                                        <StackPanel Width="120" Margin="0,0,12,10"><TextBlock Text="Minimum stock" Style="{StaticResource Label}"/><TextBox Style="{StaticResource NumberBox}" Text="{Binding MinStock, Converter={StaticResource Dec}}"/></StackPanel>
+                                    </WrapPanel>
+                                    <CheckBox IsChecked="{Binding IsStockItem}" Content="Track stock for this product (untick for made-to-order items)"/>
+                                    <TextBlock Style="{StaticResource Muted}" Visibility="{Binding CanSeeCost, Converter={StaticResource BoolToVis}}">
+                                        <Run Text="Margin at maximum discount:"/> <Run Text="{Binding Margin, Mode=OneWay, StringFormat={}{0}%}" FontWeight="SemiBold"/>
+                                    </TextBlock>
+                                    <TextBlock Style="{StaticResource Muted}" Margin="0,4,0,0" TextWrapping="Wrap"
+                                               Text="Sales staff can give up to the 'max staff discount'. Bigger discounts need a manager (permission: invoice.discount)."/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                        <!-- image + stock -->
+                        <StackPanel Grid.Column="1" Width="260">
+                            <Border Style="{StaticResource FlatCard}" Margin="0,0,12,12">
+                                <StackPanel>
+                                    <Border Height="190" Background="{StaticResource SurfaceAlt}" CornerRadius="8">
+                                        <Grid>
+                                            <TextBlock Text="&#xE91B;" Style="{StaticResource Icon}" FontSize="40" Foreground="{StaticResource BorderStrong}" HorizontalAlignment="Center"
+                                                       Visibility="{Binding Image, Converter={StaticResource NullToVis}, ConverterParameter=invert}"/>
+                                            <Image Source="{Binding Image}" Stretch="Uniform" Margin="6"/>
+                                        </Grid>
+                                    </Border>
+                                    <Button Content="Upload photo" Command="{Binding UploadImageCommand}" Margin="0,8,0,0" Visibility="{Binding CanEdit, Converter={StaticResource BoolToVis}}"/>
+                                    <TextBlock Text="PNG / JPEG up to 5 MB" Style="{StaticResource Muted}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource FlatCard}" Margin="0,0,12,12" Visibility="{Binding IsNew, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+                                <StackPanel>
+                                    <TextBlock Text="STOCK" Style="{StaticResource Label}"/>
+                                    <TextBlock FontSize="24" FontWeight="SemiBold"><Run Text="{Binding Available, Converter={StaticResource Qty}, Mode=OneWay}"/> <Run Text="available" FontSize="13" Foreground="{StaticResource TextMuted}"/></TextBlock>
+                                    <TextBlock Style="{StaticResource Muted}"><Run Text="{Binding OnHand, Converter={StaticResource Qty}, Mode=OneWay}"/> on hand across variants</TextBlock>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+
+                    <Border Style="{StaticResource FlatCard}" Margin="0,0,12,12">
+                        <StackPanel>
+                            <DockPanel Margin="0,0,0,8">
+                                <Button DockPanel.Dock="Right" Content="+ Add variant" Command="{Binding AddVariantCommand}" Visibility="{Binding CanEdit, Converter={StaticResource BoolToVis}}"/>
+                                <StackPanel>
+                                    <TextBlock Text="Variants" Style="{StaticResource SectionTitle}" Margin="0"/>
+                                    <TextBlock Style="{StaticResource Muted}" Text="Sizes, colours, seating (4 / 6 / 8 seater)… Leave price / cost empty to use the product's. Opening stock is recorded only for new variants."/>
+                                </StackPanel>
+                            </DockPanel>
+                            <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=Variants}" Style="{StaticResource FieldError}"/>
+                            <TextBlock Style="{StaticResource Muted}" Text="No variants yet — a 'Standard' variant with the product code is created automatically." Margin="0,4"
+                                       Visibility="{Binding Variants.Count, Converter={StaticResource NullToVis}, ConverterParameter=invert}"/>
+                            <ItemsControl ItemsSource="{Binding Variants}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:VariantVm}">
+                                        <Border BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,8">
+                                            <StackPanel>
+                                                <WrapPanel>
+                                                    <StackPanel Width="170" Margin="0,0,10,6"><TextBlock Text="Variant name" Style="{StaticResource Label}"/><TextBox Text="{Binding VariantName}"/></StackPanel>
+                                                    <StackPanel Width="140" Margin="0,0,10,6"><TextBlock Text="SKU *" Style="{StaticResource Label}"/><TextBox Text="{Binding Sku}" CharacterCasing="Upper"/></StackPanel>
+                                                    <StackPanel Width="150" Margin="0,0,10,6"><TextBlock Text="Barcode" Style="{StaticResource Label}"/><TextBox Text="{Binding Barcode}"/></StackPanel>
+                                                    <StackPanel Width="110" Margin="0,0,10,6"><TextBlock Text="Price" Style="{StaticResource Label}"/><TextBox Style="{StaticResource NumberBox}" Text="{Binding SellingPrice, Converter={StaticResource Dec}}"/></StackPanel>
+                                                    <StackPanel Width="110" Margin="0,0,10,6" Visibility="{Binding DataContext.CanSeeCost, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource BoolToVis}}">
+                                                        <TextBlock Text="Cost" Style="{StaticResource Label}"/><TextBox Style="{StaticResource NumberBox}" Text="{Binding CostPrice, Converter={StaticResource Dec}}"/></StackPanel>
+                                                    <StackPanel Width="90" Margin="0,0,10,6"><TextBlock Text="Min stock" Style="{StaticResource Label}"/><TextBox Style="{StaticResource NumberBox}" Text="{Binding MinStock, Converter={StaticResource Dec}}"/></StackPanel>
+                                                    <StackPanel Width="110" Margin="0,0,10,6" Visibility="{Binding IsNew, Converter={StaticResource BoolToVis}}">
+                                                        <TextBlock Text="Opening stock" Style="{StaticResource Label}"/><TextBox Style="{StaticResource NumberBox}" Text="{Binding OpeningStock, Converter={StaticResource Dec}}"/></StackPanel>
+                                                </WrapPanel>
+                                                <WrapPanel>
+                                                    <StackPanel Width="110" Margin="0,0,10,6"><TextBlock Text="Size" Style="{StaticResource Label}"/><TextBox Text="{Binding Size}"/></StackPanel>
+                                                    <StackPanel Width="110" Margin="0,0,10,6"><TextBlock Text="Colour" Style="{StaticResource Label}"/><TextBox Text="{Binding Color}"/></StackPanel>
+                                                    <StackPanel Width="110" Margin="0,0,10,6"><TextBlock Text="Material" Style="{StaticResource Label}"/><TextBox Text="{Binding Material}"/></StackPanel>
+                                                    <StackPanel Width="110" Margin="0,0,10,6"><TextBlock Text="Fabric" Style="{StaticResource Label}"/><TextBox Text="{Binding Fabric}"/></StackPanel>
+                                                    <StackPanel Width="110" Margin="0,0,10,6"><TextBlock Text="Finish" Style="{StaticResource Label}"/><TextBox Text="{Binding Finish}"/></StackPanel>
+                                                    <StackPanel Width="130" Margin="0,0,10,6"><TextBlock Text="Configuration" Style="{StaticResource Label}"/><TextBox Text="{Binding Configuration}"/></StackPanel>
+                                                    <StackPanel Width="120" Margin="0,0,10,6"><TextBlock Text="Design" Style="{StaticResource Label}"/><TextBox Text="{Binding Design}"/></StackPanel>
+                                                    <StackPanel Width="140" Margin="0,0,10,6"><TextBlock Text="Dimensions" Style="{StaticResource Label}"/><TextBox Text="{Binding Dimensions}"/></StackPanel>
+                                                </WrapPanel>
+                                                <DockPanel>
+                                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                                        <Button Style="{StaticResource LinkButton}" Content="Stock history" Margin="0,0,14,0"
+                                                                Command="{Binding DataContext.StockMovementCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
+                                                                Visibility="{Binding IsNew, Converter={StaticResource BoolToVis}, ConverterParameter=invert}"/>
+                                                        <Button Style="{StaticResource LinkButton}" Content="Remove" Foreground="{StaticResource ErrorFg}"
+                                                                Command="{Binding DataContext.RemoveVariantCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"/>
+                                                    </StackPanel>
+                                                    <CheckBox Content="Default" IsChecked="{Binding IsDefault}" Margin="0,0,14,0"/>
+                                                    <CheckBox Content="Active" IsChecked="{Binding IsActive}" Margin="0,0,14,0"/>
+                                                    <TextBlock VerticalAlignment="Center" Style="{StaticResource Muted}" Visibility="{Binding IsNew, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+                                                        <Run Text="On hand"/> <Run Text="{Binding OnHand, Converter={StaticResource Qty}, Mode=OneWay}"/> · reserved <Run Text="{Binding Reserved, Converter={StaticResource Qty}, Mode=OneWay}"/>
+                                                        · damaged <Run Text="{Binding Damaged, Converter={StaticResource Qty}, Mode=OneWay}"/>
+                                                    </TextBlock>
+                                                </DockPanel>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Busy}" Focusable="False"/>
+        </Grid>
+    </DataTemplate>
+
+    <!-- =================================================================== Categories & brands -->
+    <DataTemplate DataType="{x:Type vm:CategoriesViewModel}">
+        <Grid>
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="24,20">
+                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource PageHeading}" Margin="0,0,0,14" Focusable="False"/>
+                    <c:ResponsiveTiles MinTileWidth="480">
+                        <Border Style="{StaticResource FlatCard}" Margin="0,0,12,12">
+                            <StackPanel>
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" Content="+ New category" Command="{Binding NewCategoryCommand}" Visibility="{Binding CanEdit, Converter={StaticResource BoolToVis}}"/>
+                                    <TextBlock Text="Categories" Style="{StaticResource SectionTitle}"/>
+                                </DockPanel>
+                                <DataGrid ItemsSource="{Binding Categories}" MaxHeight="440" c:GridBehaviors.OpenCommand="{Binding EditCategoryCommand}">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" ElementStyle="{StaticResource BoldCell}"/>
+                                        <DataGridTextColumn Header="HSN" Binding="{Binding DefaultHsn}" Width="90"/>
+                                        <DataGridTextColumn Header="GST" Binding="{Binding DefaultGstRate, StringFormat={}{0:0.##}%}" Width="70"/>
+                                        <DataGridTextColumn Header="Products" Binding="{Binding ProductCount}" Width="80"/>
+                                        <DataGridTemplateColumn Width="70">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Style="{StaticResource IconButton}" Content="&#xE74D;" Foreground="{StaticResource ErrorFg}" ToolTip="Delete"
+                                                            Command="{Binding DataContext.DeleteCategoryCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                                <Border Style="{StaticResource SoftPanel}" Margin="0,12,0,0" Visibility="{Binding CanEdit, Converter={StaticResource BoolToVis}}">
+                                    <StackPanel>
+                                        <TextBlock Text="Add / edit category (double-click a row to edit)" Style="{StaticResource Label}"/>
+                                        <WrapPanel>
+                                            <StackPanel Width="200" Margin="0,0,10,6"><TextBlock Text="Name" Style="{StaticResource Label}"/><TextBox Text="{Binding Editing.Name}"/></StackPanel>
+                                            <StackPanel Width="100" Margin="0,0,10,6"><TextBlock Text="Default HSN" Style="{StaticResource Label}"/><TextBox Text="{Binding Editing.DefaultHsn}"/></StackPanel>
+                                            <StackPanel Width="90" Margin="0,0,10,6"><TextBlock Text="GST %" Style="{StaticResource Label}"/>
+                                                <ComboBox ItemsSource="{Binding GstRates}" SelectedItem="{Binding Editing.DefaultGstRate}" ItemStringFormat="{}{0:0.##}%"/></StackPanel>
+                                            <StackPanel Width="90" Margin="0,0,10,6"><TextBlock Text="Active" Style="{StaticResource Label}"/><CheckBox IsChecked="{Binding Editing.IsActive}" Content="Yes"/></StackPanel>
+                                        </WrapPanel>
+                                        <Button Content="Save category" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Command="{Binding SaveCategoryCommand}"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource FlatCard}" Margin="0,0,12,12">
+                            <StackPanel>
+                                <TextBlock Text="Brands" Style="{StaticResource SectionTitle}"/>
+                                <DataGrid ItemsSource="{Binding Brands}" MaxHeight="440" c:GridBehaviors.OpenCommand="{Binding EditBrandCommand}">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Brand" Binding="{Binding Name}" Width="*" ElementStyle="{StaticResource BoldCell}"/>
+                                        <DataGridCheckBoxColumn Header="Active" Binding="{Binding IsActive}" Width="70"/>
+                                        <DataGridTemplateColumn Width="70">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Style="{StaticResource IconButton}" Content="&#xE74D;" Foreground="{StaticResource ErrorFg}" ToolTip="Delete"
+                                                            Command="{Binding DataContext.DeleteBrandCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                                <Border Style="{StaticResource SoftPanel}" Margin="0,12,0,0" Visibility="{Binding CanEdit, Converter={StaticResource BoolToVis}}">
+                                    <WrapPanel>
+                                        <StackPanel Width="220" Margin="0,0,10,0"><TextBlock Text="Brand name" Style="{StaticResource Label}"/><TextBox Text="{Binding EditingBrand.Name}"/></StackPanel>
+                                        <Button Content="Save brand" Style="{StaticResource PrimaryButton}" VerticalAlignment="Bottom" Command="{Binding SaveBrandCommand}"/>
+                                    </WrapPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </c:ResponsiveTiles>
+                </StackPanel>
+            </ScrollViewer>
+            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Busy}" Focusable="False"/>
+        </Grid>
+    </DataTemplate>
+
+    <!-- =================================================================== Variants -->
+    <DataTemplate DataType="{x:Type vm:VariantListViewModel}">
+        <Grid Margin="24,20">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <DockPanel Margin="0,0,0,14">
+                <Button DockPanel.Dock="Right" Content="Generate missing barcodes" Command="{Binding AssignBarcodesCommand}" VerticalAlignment="Top"
+                        Visibility="{Binding CanManage, Converter={StaticResource BoolToVis}}"/>
+                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource PageHeading}" Focusable="False"/>
+            </DockPanel>
+            <ContentControl Grid.Row="1" Content="{Binding}" ContentTemplate="{StaticResource ListToolbar}" Focusable="False"/>
+            <Border Grid.Row="2" Style="{StaticResource FlatCard}" Padding="0">
+                <Grid>
+                    <DataGrid ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" c:GridBehaviors.OpenCommand="{Binding OpenCommand}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Product" Binding="{Binding ProductName}" Width="*" ElementStyle="{StaticResource BoldCell}"/>
+                            <DataGridTextColumn Header="Variant" Binding="{Binding VariantName}" Width="150"/>
+                            <DataGridTextColumn Header="SKU" Binding="{Binding Sku}" Width="130"/>
+                            <DataGridTextColumn Header="Barcode" Binding="{Binding Barcode}" Width="130"/>
+                            <DataGridTextColumn Header="Category" Binding="{Binding CategoryName}" Width="120"/>
+                            <DataGridTextColumn Header="Price" Binding="{Binding SellingPrice, Converter={StaticResource Money}}" Width="110" ElementStyle="{StaticResource RightCell}"/>
+                            <DataGridTextColumn Header="On hand" Binding="{Binding OnHand, Converter={StaticResource Qty}}" Width="80" ElementStyle="{StaticResource RightCell}"/>
+                            <DataGridTextColumn Header="Reserved" Binding="{Binding Reserved, Converter={StaticResource Qty}}" Width="80" ElementStyle="{StaticResource RightCell}"/>
+                            <DataGridTextColumn Header="Available" Binding="{Binding Available, Converter={StaticResource Qty}}" Width="80" ElementStyle="{StaticResource RightCell}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <c:EmptyState Title="No variants" Message="{Binding EmptyMessage}" Icon="&#xE8F1;" Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}"/>
+                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Busy}" Focusable="False"/>
+                </Grid>
+            </Border>
+            <ContentControl Grid.Row="3" Content="{Binding}" ContentTemplate="{StaticResource ListPager}" Focusable="False"/>
+        </Grid>
+    </DataTemplate>
+
+    <!-- =================================================================== Barcode labels -->
+    <DataTemplate DataType="{x:Type vm:BarcodeViewModel}">
+        <Grid Margin="24,20">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource PageHeading}" Margin="0,0,0,14" Focusable="False"/>
+            <WrapPanel Grid.Row="1" Margin="0,0,0,12">
+                <TextBox Text="{Binding Search, UpdateSourceTrigger=PropertyChanged, Delay=300}" Width="280" Margin="0,0,10,8" AutomationProperties.Name="Filter products"/>
+                <ComboBox ItemsSource="{Binding Formats}" SelectedItem="{Binding Format}" Width="280" Margin="0,0,10,8"/>
+                <CheckBox Content="QR code instead of barcode" IsChecked="{Binding UseQr}" Margin="0,0,14,8"/>
+                <Button Content="Select all" Command="{Binding SelectAllCommand}" Margin="0,0,6,8" Style="{StaticResource GhostButton}"/>
+                <Button Content="None" Command="{Binding SelectNoneCommand}" Margin="0,0,10,8" Style="{StaticResource GhostButton}"/>
+                <Button Content="Preview" Command="{Binding PreviewCommand}" Margin="0,0,8,8"/>
+                <Button Content="PDF" Command="{Binding PdfCommand}" Margin="0,0,8,8"/>
+                <Button Content="Print labels" Command="{Binding PrintCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,8,8"/>
+            </WrapPanel>
+            <Border Grid.Row="2" Style="{StaticResource FlatCard}" Padding="0">
+                <Grid>
+                    <DataGrid ItemsSource="{Binding Rows}" IsReadOnly="False" SelectionUnit="Cell">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="Print" Width="60">
+                                <DataGridTemplateColumn.CellTemplate><DataTemplate><CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="Copies" Width="80">
+                                <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBox Text="{Binding Copies, UpdateSourceTrigger=PropertyChanged}" MinHeight="30" TextAlignment="Center"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Product" Binding="{Binding Item.DisplayName}" Width="*" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="SKU" Binding="{Binding Item.Sku}" Width="140" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Barcode" Binding="{Binding Item.Barcode}" Width="150" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Price" Binding="{Binding Item.SellingPrice, Converter={StaticResource Money}}" Width="110" IsReadOnly="True" ElementStyle="{StaticResource RightCell}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Busy}" Focusable="False"/>
+                </Grid>
+            </Border>
+        </Grid>
+    </DataTemplate>
+
+    <!-- =================================================================== Stock -->
+    <DataTemplate DataType="{x:Type vm:StockViewModel}">
+        <Grid Margin="24,20">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <DockPanel Margin="0,0,0,14">
+                <Border DockPanel.Dock="Right" Style="{StaticResource SoftPanel}" VerticalAlignment="Top" Visibility="{Binding StockValue, Converter={StaticResource NullToVis}}">
+                    <StackPanel>
+                        <TextBlock Text="STOCK VALUE (AT COST)" Style="{StaticResource Label}"/>
+                        <TextBlock Text="{Binding StockValue, Converter={StaticResource Money}}" FontSize="20" FontWeight="Bold"/>
+                    </StackPanel>
+                </Border>
+                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource PageHeading}" Focusable="False"/>
+            </DockPanel>
+            <ContentControl Grid.Row="1" Content="{Binding}" ContentTemplate="{StaticResource ListToolbar}" Focusable="False"/>
+            <Border Grid.Row="2" Style="{StaticResource FlatCard}" Padding="0">
+                <Grid>
+                    <DataGrid ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" c:GridBehaviors.ServerSort="True" c:GridBehaviors.OpenCommand="{Binding OpenCommand}"
+                              AutomationProperties.Name="Stock">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="Product" SortMemberPath="name" Width="*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate><StackPanel VerticalAlignment="Center"><TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold"/><TextBlock Text="{Binding Sku}" Style="{StaticResource Muted}"/></StackPanel></DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Category" Binding="{Binding CategoryName}" SortMemberPath="category" Width="120"/>
+                            <DataGridTextColumn Header="On hand" Binding="{Binding OnHand, Converter={StaticResource Qty}}" SortMemberPath="on_hand" Width="80" ElementStyle="{StaticResource RightCell}"/>
+                            <DataGridTextColumn Header="Reserved" Binding="{Binding Reserved, Converter={StaticResource Qty}}" SortMemberPath="reserved" Width="80" ElementStyle="{StaticResource RightCell}"/>
+                            <DataGridTextColumn Header="Available" Binding="{Binding Available, Converter={StaticResource Qty}}" SortMemberPath="available" Width="85" ElementStyle="{StaticResource RightCell}" FontWeight="SemiBold"/>
+                            <DataGridTextColumn Header="Damaged" Binding="{Binding Damaged, Converter={StaticResource Qty}}" Width="80" ElementStyle="{StaticResource RightCell}"/>
+                            <DataGridTextColumn Header="Display" Binding="{Binding DisplayQty, Converter={StaticResource Qty}}" Width="70" ElementStyle="{StaticResource RightCell}"/>
+                            <DataGridTextColumn Header="Min" Binding="{Binding MinStock, Converter={StaticResource Qty}}" Width="60" ElementStyle="{StaticResource RightCell}"/>
+                            <DataGridTextColumn Header="Value (cost)" Binding="{Binding StockValue, Converter={StaticResource Money}, ConverterParameter=dash}" SortMemberPath="value" Width="120" ElementStyle="{StaticResource RightCell}"/>
+                            <DataGridTemplateColumn Header="Status" Width="120"><DataGridTemplateColumn.CellTemplate><DataTemplate><c:StatusBadge Status="{Binding StockState}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                            <DataGridTemplateColumn Width="90">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="Adjust" MinHeight="28" Padding="10,0"
+                                                Command="{Binding DataContext.AdjustCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}"
+                                                Visibility="{Binding DataContext.CanAdjust, RelativeSource={RelativeSource AncestorType=DataGrid}, Converter={StaticResource BoolToVis}}"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <c:EmptyState Title="Nothing to show" Message="{Binding EmptyMessage}" Icon="&#xE7B8;" Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}"/>
+                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Busy}" Focusable="False"/>
+                </Grid>
+            </Border>
+            <ContentControl Grid.Row="3" Content="{Binding}" ContentTemplate="{StaticResource ListPager}" Focusable="False"/>
+        </Grid>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:AdjustStockDialogViewModel}">
+        <StackPanel>
+            <Border Style="{StaticResource SoftPanel}" Margin="0,0,0,12">
+                <TextBlock>
+                    <Run Text="On hand"/> <Run Text="{Binding Row.OnHand, Converter={StaticResource Qty}, Mode=OneWay}" FontWeight="Bold"/> ·
+                    <Run Text="reserved"/> <Run Text="{Binding Row.Reserved, Converter={StaticResource Qty}, Mode=OneWay}" FontWeight="Bold"/> ·
+                    <Run Text="damaged"/> <Run Text="{Binding Row.Damaged, Converter={StaticResource Qty}, Mode=OneWay}" FontWeight="Bold"/>
+                </TextBlock>
+            </Border>
+            <TextBlock Text="What happened?" Style="{StaticResource Label}"/>
+            <ComboBox ItemsSource="{Binding Types}" SelectedItem="{Binding Type}" Margin="0,0,0,10"/>
+            <TextBlock Text="Quantity" Style="{StaticResource Label}"/>
+            <TextBox Style="{StaticResource NumberBox}" Text="{Binding Quantity, Converter={StaticResource Dec}}" Margin="0,0,0,4"/>
+            <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=Quantity}" Style="{StaticResource FieldError}"/>
+            <TextBlock Text="Reason (required)" Style="{StaticResource Label}" Margin="0,8,0,4"/>
+            <TextBox Text="{Binding Reason}" Style="{StaticResource MultilineBox}" MinHeight="54"/>
+            <TextBlock Text="{Binding Errors, Converter={StaticResource Err}, ConverterParameter=Reason}" Style="{StaticResource FieldError}"/>
+        </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:StockAdjustViewModel}">
+        <Grid>
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="24,20" MaxWidth="1000" HorizontalAlignment="Left">
+                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource PageHeading}" Margin="0,0,0,14" Focusable="False"/>
+                    <Border Style="{StaticResource FlatCard}" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="Product" Style="{StaticResource Label}"/>
+                            <TextBox Text="{Binding Search, UpdateSourceTrigger=PropertyChanged, Delay=300}" Width="420" HorizontalAlignment="Left" c:FocusBehavior.FocusOnLoad="True"
+                                     AutomationProperties.Name="Scan or search product"/>
+                            <TextBlock Text="Scan the barcode or type the name / SKU" Style="{StaticResource Muted}" Margin="0,4,0,4"/>
+                            <ItemsControl ItemsSource="{Binding Results}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Padding="8,4"
+                                                Command="{Binding DataContext.PickCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}">
+                                            <TextBlock><Run Text="{Binding DisplayName, Mode=OneWay}" FontWeight="SemiBold"/> · <Run Text="{Binding Sku, Mode=OneWay}"/> · <Run Text="{Binding OnHand, Converter={StaticResource Qty}, Mode=OneWay}"/> on hand</TextBlock>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Border Style="{StaticResource SoftPanel}" Margin="0,8,0,0" Visibility="{Binding Item, Converter={StaticResource NullToVis}}">
+                                <TextBlock TextWrapping="Wrap">
+                                    <Run Text="{Binding Item.DisplayName, Mode=OneWay}" FontWeight="Bold"/> (<Run Text="{Binding Item.Sku, Mode=OneWay}"/>) — on hand
+                                    <Run Text="{Binding Levels.OnHand, Converter={StaticResource Qty}, Mode=OneWay}" FontWeight="Bold"/>, reserved
+                                    <Run Text="{Binding Levels.Reserved, Converter={StaticResource Qty}, Mode=OneWay}" FontWeight="Bold"/>, damaged
+                                    <Run Text="{Binding Levels.Damaged, Converter={StaticResource Qty}, Mode=OneWay}" FontWeight="Bold"/>
+                                </TextBlock>
+                            </Border>
+                            <WrapPanel Margin="0,12,0,0">
+                                <StackPanel Width="260" Margin="0,0,12,8"><TextBlock Text="Type" Style="{StaticResource Label}"/><ComboBox ItemsSource="{Binding Types}" SelectedItem="{Binding SelectedType}"/></StackPanel>
+                                <StackPanel Width="120" Margin="0,0,12,8"><TextBlock Text="Quantity" Style="{StaticResource Label}"/><TextBox Style="{StaticResource NumberBox}" Text="{Binding Quantity, Converter={StaticResource Dec}}"/></StackPanel>
+                                <StackPanel Width="140" Margin="0,0,12,8" Visibility="{Binding CanSeeCost, Converter={StaticResource BoolToVis}}"><TextBlock Text="Unit cost" Style="{StaticResource Label}"/><TextBox Style="{StaticResource NumberBox}" Text="{Binding UnitCost, Converter={StaticResource Dec}}"/></StackPanel>
+                            </WrapPanel>
+                            <TextBlock Text="Reason (required)" Style="{StaticResource Label}"/>
+                            <TextBox Text="{Binding Reason}" Style="{StaticResource MultilineBox}" MinHeight="50"/>
+                            <TextBlock Text="{Binding ErrorMessage}" Style="{StaticResource FieldError}"/>
+                            <Button Content="Save" Style="{StaticResource PrimaryButton}" Command="{Binding SaveCommand}" HorizontalAlignment="Right" MinWidth="140" Margin="0,12,0,0"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource FlatCard}">
+                        <StackPanel>
+                            <TextBlock Text="Recent manual stock changes" Style="{StaticResource SectionTitle}"/>
+                            <DataGrid ItemsSource="{Binding Recent}" MaxHeight="360">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="When" Binding="{Binding CreatedAt, Converter={StaticResource Date}, ConverterParameter=time}" Width="140"/>
+                                    <DataGridTextColumn Header="Product" Binding="{Binding ProductName}" Width="*"/>
+                                    <DataGridTextColumn Header="Type" Binding="{Binding MovementType, Converter={StaticResource StatusLabel}}" Width="130"/>
+                                    <DataGridTextColumn Header="Change" Binding="{Binding OnHandDelta, Converter={StaticResource Qty}}" Width="70" ElementStyle="{StaticResource RightCell}"/>
+                                    <DataGridTextColumn Header="Reason" Binding="{Binding Note}" Width="*"/>
+                                    <DataGridTextColumn Header="By" Binding="{Binding CreatedByName}" Width="120"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Busy}" Focusable="False"/>
+        </Grid>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:ReservedStockViewModel}">
+        <Grid Margin="24,20">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+            <DockPanel Margin="0,0,0,14">
+                <Button DockPanel.Dock="Right" Content="Refresh" Command="{Binding RefreshCommand}" VerticalAlignment="Top"/>
+                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource PageHeading}" Focusable="False"/>
+            </DockPanel>
+            <Border Grid.Row="1" Style="{StaticResource FlatCard}" Padding="0">
+                <Grid>
+                    <DataGrid ItemsSource="{Binding Rows}" c:GridBehaviors.OpenCommand="{Binding OpenCommand}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Sales order" Binding="{Binding SalesOrderNumber}" Width="140" ElementStyle="{StaticResource BoldCell}"/>
+                            <DataGridTextColumn Header="Customer" Binding="{Binding CustomerName}" Width="*"/>
+                            <DataGridTextColumn Header="Product" Binding="{Binding ProductName}" Width="*"/>
+                            <DataGridTextColumn Header="SKU" Binding="{Binding Sku}" Width="120"/>
+                            <DataGridTextColumn Header="Reserved" Binding="{Binding ReservedQty, Converter={StaticResource Qty}}" Width="90" ElementStyle="{StaticResource RightCell}"/>
+                            <DataGridTextColumn Header="Delivery by" Binding="{Binding ExpectedDeliveryDate, Converter={StaticResource Date}, ConverterParameter=dash}" Width="110"/>
+                            <DataGridTemplateColumn Header="Order status" Width="140"><DataGridTemplateColumn.CellTemplate><DataTemplate><c:StatusBadge Status="{Binding Status}"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <c:EmptyState Title="No reserved stock" Message="Stock is reserved automatically when a sales order is confirmed." Icon="&#xE72E;"
+                                  Visibility="{Binding Rows.Count, Converter={StaticResource NullToVis}, ConverterParameter=invert}"/>
+                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Busy}" Focusable="False"/>
+                </Grid>
+            </Border>
+        </Grid>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:MovementListViewModel}">
+        <Grid Margin="24,20">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource PageHeading}" Margin="0,0,0,14" Focusable="False"/>
+            <ContentControl Grid.Row="1" Content="{Binding}" ContentTemplate="{StaticResource ListToolbar}" Focusable="False"/>
+            <Border Grid.Row="2" Style="{StaticResource FlatCard}" Padding="0">
+                <Grid>
+                    <DataGrid ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" c:GridBehaviors.OpenCommand="{Binding OpenCommand}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="When" Binding="{Binding CreatedAt, Converter={StaticResource Date}, ConverterParameter=time}" Width="140"/>
+                            <DataGridTemplateColumn Header="Product" Width="*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate><StackPanel VerticalAlignment="Center"><TextBlock Text="{Binding ProductName}" FontWeight="SemiBold"/><TextBlock Text="{Binding Sku}" Style="{StaticResource Muted}"/></StackPanel></DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Movement" Binding="{Binding MovementType, Converter={StaticResource StatusLabel}}" Width="140"/>
+                            <DataGridTextColumn Header="Qty" Binding="{Binding OnHandDelta, Converter={StaticResource Qty}}" Width="60" ElementStyle="{StaticResource RightCell}"/>
+                            <DataGridTextColumn Header="Reserved Δ" Binding="{Binding ReservedDelta, Converter={StaticResource Qty}}" Width="80" ElementStyle="{StaticResource RightCell}"/>
+                            <DataGridTextColumn Header="Damaged Δ" Binding="{Binding DamagedDelta, Converter={StaticResource Qty}}" Width="80" ElementStyle="{StaticResource RightCell}"/>
+                            <DataGridTextColumn Header="Balance" Binding="{Binding OnHandAfter, Converter={StaticResource Qty}}" Width="70" ElementStyle="{StaticResource RightCell}"/>
+                            <DataGridTextColumn Header="Reference" Binding="{Binding RefNumber}" Width="140"/>
+                            <DataGridTextColumn Header="Note" Binding="{Binding Note}" Width="160"/>
+                            <DataGridTextColumn Header="By" Binding="{Binding CreatedByName}" Width="110"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <c:EmptyState Title="No stock movements" Message="{Binding EmptyMessage}" Icon="&#xE8AB;" Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}"/>
+                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource Busy}" Focusable="False"/>
+                </Grid>
+            </Border>
+            <ContentControl Grid.Row="3" Content="{Binding}" ContentTemplate="{StaticResource ListPager}" Focusable="False"/>
+        </Grid>
+    </DataTemplate>
+</ResourceDictionary>

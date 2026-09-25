@@ -34,7 +34,7 @@ public sealed class AppServices : IAsyncDisposable
         Reports = new ReportService(Db, Session);
         Dashboard = new DashboardService(Db, Session);
         Search = new SearchService(Db, Session);
-        Notifications = new NotificationService(Db, Session);
+        Notifications = new NotificationService(Db, Session, Settings);
         Backup = new BackupService(Db, Session, Audit, Settings);
         Documents = new DocumentService(this);
         Migrator = new Migrator(Db);

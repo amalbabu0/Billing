@@ -606,7 +606,7 @@ public static class Layouts
         {
             var barTop = priceY + 10;
             var barH = Math.Max(8, y + h - pad - 8 - barTop);
-            Barcodes.DrawLinear(c, Barcodes.Linear(it.Code), x + pad, barTop, w - 2 * pad, barH);
+            Barcodes.DrawLinear(c, Barcodes.Linear(it.Code), x + pad + 6, barTop, w - 2 * pad - 12, barH);
             c.Text(it.Code, x + pad, barTop + barH + 1, 6, false, Ink, TextAlign.Center, w - 2 * pad);
         }
     }
