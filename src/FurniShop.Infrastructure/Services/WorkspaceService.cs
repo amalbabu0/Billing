@@ -154,6 +154,17 @@ public sealed class TimelineItem
     public string? Status { get; set; }
 }
 
+public sealed class DocumentPreview
+{
+    public List<DocumentLine> Lines { get; set; } = new();
+    public Core.Tax.DocumentTotals Totals { get; set; } = null!;
+    public bool IsInterState { get; set; }
+    public string? PlaceOfSupply { get; set; }
+    public string? PlaceOfSupplyName => Core.Validation.IndianStates.NameOf(PlaceOfSupply);
+    /// <summary>Set when a discount is above what this user may give; saving will be refused until a manager approves.</summary>
+    public string? DiscountWarning { get; set; }
+}
+
 // ============================================================================ service
 
 /// <summary>Read models for the web workspace: dashboard, product browser, stock drawer, POS favourites, customer timeline.</summary>
@@ -471,6 +482,31 @@ public sealed class WorkspaceService(Db db, UserSession session, CatalogService 
         foreach (var id in ids)
             if (await catalog.GetSellableAsync(id) is { } item) list.Add(item);
         return list;
+    }
+
+    // ------------------------------------------------------------------ live totals
+    /// <summary>
+    /// Computes lines and totals exactly as saving would (same builder, same GST calculator) without writing anything.
+    /// Used by the POS, quotation and order editors for live totals.
+    /// </summary>
+    public async Task<DocumentPreview> PreviewAsync(SalesDocumentInput input)
+    {
+        session.DemandAny(Perm.InvoiceCreate, Perm.QuotationManage, Perm.SalesOrderManage);
+        return await db.InTransactionAsync(async (conn, tx) =>
+        {
+            var settings = await SettingsService.LoadAsync(conn, tx);
+            string? warning = null;
+            BuiltDocument built;
+            try { built = await SalesDocumentBuilder.BuildAsync(conn, tx, session, settings, input); }
+            catch (PermissionDeniedException ex)
+            {
+                var i = ex.Permission.IndexOf(": ", StringComparison.Ordinal);
+                warning = i >= 0 ? char.ToUpperInvariant(ex.Permission[i + 2]) + ex.Permission[(i + 3)..] : "This discount needs a manager's approval.";
+                built = await SalesDocumentBuilder.BuildAsync(conn, tx, session, settings, input, enforceDiscount: false);
+            }
+            if (!session.CanSeeCost) built.Lines.ForEach(l => l.UnitCost = null);
+            return new DocumentPreview { Lines = built.Lines, Totals = built.Totals, IsInterState = built.InterState, PlaceOfSupply = built.PlaceOfSupply, DiscountWarning = warning };
+        });
     }
 
     // ------------------------------------------------------------------ customer timeline

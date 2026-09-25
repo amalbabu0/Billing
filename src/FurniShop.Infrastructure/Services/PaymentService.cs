@@ -299,6 +299,38 @@ public sealed class PaymentService(Db db, UserSession session, AuditService audi
         from payments p join customers c on c.id = p.customer_id left join users u on u.id = p.created_by
         """;
 
+    /// <summary>What a document is worth, what has been paid against it and what is left — for the payment screen.</summary>
+    public async Task<DocumentPosition> PositionAsync(string docType, long docId)
+    {
+        session.DemandAny(Perm.PaymentView, Perm.PaymentReceive);
+        await using var conn = await db.OpenAsync();
+        var (customerId, number, total) = docType switch
+        {
+            DocType.Invoice => await conn.QuerySingleOrDefaultAsync<(long, string?, decimal)>(
+                "select customer_id, number, grand_total from invoices where id = @docId and status = 'FINAL'", new { docId }),
+            DocType.SalesOrder => await conn.QuerySingleOrDefaultAsync<(long, string?, decimal)>(
+                "select customer_id, number, grand_total from sales_orders where id = @docId", new { docId }),
+            DocType.CustomOrder => await conn.QuerySingleOrDefaultAsync<(long, string?, decimal)>(
+                "select customer_id, number, coalesce(nullif(final_price, 0), estimated_cost) from custom_orders where id = @docId", new { docId }),
+            _ => throw new ValidationException("DocType", "Payments can be taken against an invoice, sales order or custom order."),
+        };
+        if (customerId == 0) throw new NotFoundException(docType, docId);
+        decimal returned = 0, paid;
+        if (docType == DocType.Invoice)
+        {
+            var pos = await InvoicePositionAsync(conn, null, docId);
+            returned = total - pos.Net;
+            paid = pos.Paid;
+        }
+        else paid = await PaidAsync(conn, null, docType, docId);
+        var advance = await PaidAsync(conn, null, DocType.OnAccount, null, customerId);
+        return new DocumentPosition
+        {
+            DocType = docType, DocId = docId, Number = number, CustomerId = customerId, Total = total, Returned = returned, Paid = paid,
+            Balance = total - returned - paid, CustomerAdvance = advance,
+        };
+    }
+
     public async Task<PagedResult<Payment>> ListAsync(ListQuery q, string? method = null)
     {
         session.Demand(Perm.PaymentView);
@@ -345,4 +377,18 @@ public sealed class PaymentService(Db db, UserSession session, AuditService audi
     }
 
     private static string? Blank(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+}
+
+public sealed class DocumentPosition
+{
+    public string DocType { get; set; } = "";
+    public long DocId { get; set; }
+    public string? Number { get; set; }
+    public long CustomerId { get; set; }
+    public decimal Total { get; set; }
+    public decimal Returned { get; set; }
+    public decimal Paid { get; set; }
+    public decimal Balance { get; set; }
+    /// <summary>Money the customer has on account that can be applied.</summary>
+    public decimal CustomerAdvance { get; set; }
 }

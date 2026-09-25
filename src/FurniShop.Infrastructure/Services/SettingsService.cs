@@ -14,8 +14,8 @@ namespace FurniShop.Infrastructure.Services;
 /// <summary>Typed application settings stored as JSON rows, plus GST / HSN / payment-method / numbering masters.</summary>
 public sealed class SettingsService(Db db, UserSession session, AuditService audit)
 {
-    private AppSettingsSnapshot? _cache;
-    private DateTime _cacheAt;
+    // Shared by every SettingsService on the same database (the web server builds one per request).
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (AppSettingsSnapshot Value, DateTime At)> Cache = new();
 
     public static readonly IReadOnlyDictionary<string, Type> Sections = new Dictionary<string, Type>
     {
@@ -29,11 +29,11 @@ public sealed class SettingsService(Db db, UserSession session, AuditService aud
     /// <summary>Returns cached settings (refreshed every 60 s so other tills pick up changes).</summary>
     public async Task<AppSettingsSnapshot> GetAsync(bool refresh = false)
     {
-        if (!refresh && _cache is not null && DateTime.UtcNow - _cacheAt < TimeSpan.FromSeconds(60)) return _cache;
+        if (!refresh && Cache.TryGetValue(db.ConnectionString, out var c) && DateTime.UtcNow - c.At < TimeSpan.FromSeconds(60)) return c.Value;
         await using var conn = await db.OpenAsync();
-        _cache = await LoadAsync(conn, null);
-        _cacheAt = DateTime.UtcNow;
-        return _cache;
+        var value = await LoadAsync(conn, null);
+        Cache[db.ConnectionString] = (value, DateTime.UtcNow);
+        return value;
     }
 
     internal static async Task<AppSettingsSnapshot> LoadAsync(NpgsqlConnection conn, NpgsqlTransaction? tx)
@@ -72,7 +72,7 @@ public sealed class SettingsService(Db db, UserSession session, AuditService aud
             await audit.LogAsync(conn, tx, "UPDATE", "Settings", $"updated {key} settings", "settings", null, key,
                 old is null ? null : JsonDocument.Parse(old).RootElement, value);
         });
-        _cache = null;
+        Cache.TryRemove(db.ConnectionString, out _);
         SettingsChanged?.Invoke(this, EventArgs.Empty);
     }
 

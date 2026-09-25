@@ -124,6 +124,7 @@ public sealed class ReturnService(Db db, UserSession session, AuditService audit
     /// <summary>What the customer will pay (or get back) for an exchange, before it is saved.</summary>
     public async Task<ExchangePreview> PreviewExchangeAsync(ExchangeInput input, decimal newInvoiceTotal)
     {
+        session.Demand(Perm.ReturnManage);
         await using var conn = await db.OpenAsync();
         var items = (await conn.QueryAsync<ItemRow>("select * from invoice_items where invoice_id = @OriginalInvoiceId", input)).ToDictionary(i => i.Id);
         var oldValue = input.ReturnLines.Where(l => l.Quantity > 0 && items.ContainsKey(l.InvoiceItemId))
