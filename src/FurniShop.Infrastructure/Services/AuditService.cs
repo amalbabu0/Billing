@@ -33,7 +33,7 @@ public sealed class AuditService(Db db, UserSession session)
                 RecordType = recordType, RecordId = recordId, RecordRef = recordRef,
                 Summary = $"{(session.IsAuthenticated ? session.FullName : "System")} {summary}",
                 Old = Serialize(oldValue), New = Serialize(newValue),
-                Machine = UserSession.MachineName, Ip = UserSession.IpAddress,
+                Machine = session.ClientDevice ?? UserSession.MachineName, Ip = session.ClientIp ?? UserSession.IpAddress,
             }, tx);
 
     public async Task LogAsync(string action, string module, string summary, string? recordType = null,

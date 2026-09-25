@@ -377,16 +377,18 @@ public sealed class DemoDataSeeder(AppServices app)
 
         await Create(6, "Wardrobe", "Sliding door with mirror panel", 8, 7, 2, "Teak", "Walnut", 4, 2, 85000, 0, 0, 4, 20, true, 25000);
         var c2 = await Create(1, "Modular Kitchen Cabinets", "L-shaped, handle-less", 10, 3, 2, "BWP Plywood", "Acrylic White", 8, 6, 145000, 142000, 98000, 30, 3, true, 50000);
+        await app.CustomOrders.AdvanceAsync(c2, "Design approved by customer"); // design
         await app.CustomOrders.AdvanceAsync(c2); // production
         await app.CustomOrders.AdvanceAsync(c2, "Assembly done"); // quality check
         var c3 = await Create(9, "Pooja Mandir", "Carved teak with bells", 3, 5, 1.5m, "Teak", "Natural Polish", 2, 1, 38000, 36500, 24000, 25, -2, false, 15000);
+        await app.CustomOrders.AdvanceAsync(c3);
         await app.CustomOrders.AdvanceAsync(c3);
         await app.CustomOrders.AdvanceAsync(c3);
         await app.CustomOrders.AdvanceAsync(c3, "QC passed"); // ready
         await app.CustomOrders.GenerateInvoiceAsync(c3, Array.Empty<PaymentLineInput>());
         await app.Deliveries.CreateForCustomOrderAsync(c3, today);
         var c4 = await Create(4, "Study Table", "Wall-mounted foldable", 4, 2.5m, 1.5m, "Sheesham", "Honey", 0, 3, 18000, 0, 0, 1, 25, false, 5000);
-        await app.CustomOrders.AdvanceAsync(c4);
+        await app.CustomOrders.AdvanceAsync(c4, "Sketch shared on WhatsApp"); // design
     }
 
     private async Task DeliveriesAsync(DateTime today)

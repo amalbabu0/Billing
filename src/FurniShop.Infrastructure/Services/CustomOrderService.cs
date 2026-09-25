@@ -136,7 +136,7 @@ public sealed class CustomOrderService(Db db, UserSession session, AuditService 
             var o = await conn.QuerySingleOrDefaultAsync<CustomOrder>("select * from custom_orders where id = @id for update", new { id }, tx)
                     ?? throw new NotFoundException("Custom order", id);
             if (o.InvoiceId.HasValue) throw new BusinessRuleException("This order has already been invoiced.");
-            if (o.Status is CustomOrderStatus.Received or CustomOrderStatus.Production or CustomOrderStatus.QualityCheck or CustomOrderStatus.Cancelled)
+            if (o.Status is CustomOrderStatus.Received or CustomOrderStatus.Design or CustomOrderStatus.Production or CustomOrderStatus.QualityCheck or CustomOrderStatus.Cancelled)
                 throw new BusinessRuleException("The order can be invoiced once it is Ready.");
             if (o.FinalPrice <= 0) throw new BusinessRuleException("Enter the final price first.");
             var s = await SettingsService.LoadAsync(conn, tx);

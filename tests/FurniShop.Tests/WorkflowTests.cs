@@ -333,6 +333,7 @@ public class PurchaseAndOrderTests(DbFixture f) : IClassFixture<DbFixture>
         var o = await f.App.CustomOrders.GetAsync(id);
         Assert.Equal((25000m, 60000m), (o.AdvancePaid, o.Balance));
 
+        Assert.Equal(CustomOrderStatus.Design, await f.App.CustomOrders.AdvanceAsync(id));
         await f.App.CustomOrders.AdvanceAsync(id); // production
         await f.App.CustomOrders.AdvanceAsync(id); // QC
         await Assert.ThrowsAsync<BusinessRuleException>(() => f.App.CustomOrders.AdvanceAsync(id)); // final price missing

@@ -651,14 +651,16 @@ public sealed class Purchase
     public decimal RoundOff { get; set; }
     public decimal GrandTotal { get; set; }
     public string? Notes { get; set; }
+    public decimal ReturnedTotal { get; set; }
     public decimal Paid { get; set; }
-    public decimal Balance => Status == PurchaseStatus.Completed ? GrandTotal - Paid : 0;
+    public decimal NetTotal => GrandTotal - ReturnedTotal;
+    public decimal Balance => Status == PurchaseStatus.Completed ? NetTotal - Paid : 0;
     public DateTime CreatedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
     public string? CreatedByName { get; set; }
     public string? CancelReason { get; set; }
     public List<PurchaseLine> Lines { get; set; } = new();
-    public string PaymentState => Status != PurchaseStatus.Completed ? Status : Domain.PaymentState.Of(GrandTotal, Paid, DueDate, DateTime.Today);
+    public string PaymentState => Status != PurchaseStatus.Completed ? Status : Domain.PaymentState.Of(NetTotal, Paid, DueDate, DateTime.Today);
 }
 
 public sealed class PurchaseLine
@@ -679,6 +681,8 @@ public sealed class PurchaseLine
     public decimal Sgst { get; set; }
     public decimal Igst { get; set; }
     public decimal LineTotal { get; set; }
+    public decimal ReturnedQty { get; set; }
+    public decimal ReturnableQty => Quantity - ReturnedQty;
 }
 
 public sealed class SupplierPayment

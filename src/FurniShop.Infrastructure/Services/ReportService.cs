@@ -247,7 +247,7 @@ public sealed class ReportService(Db db, UserSession session)
                            (select count(*) from purchases p where p.supplier_id = s.id and p.status = 'COMPLETED' and p.purchase_date between @From and @To) as "Purchases",
                            coalesce((select sum(grand_total) from purchases p where p.supplier_id = s.id and p.status = 'COMPLETED' and p.purchase_date between @From and @To),0) as "Purchase value",
                            coalesce((select sum(amount) from supplier_payments sp where sp.supplier_id = s.id and not sp.is_voided and sp.payment_date between @From and @To),0) as "Paid in period",
-                           coalesce((select sum(grand_total) from purchases p where p.supplier_id = s.id and p.status = 'COMPLETED'),0)
+                           coalesce((select sum(grand_total - returned_total) from purchases p where p.supplier_id = s.id and p.status = 'COMPLETED'),0)
                              - coalesce((select sum(amount) from supplier_payments sp where sp.supplier_id = s.id and not sp.is_voided),0) as "Total outstanding"
                     from suppliers s where not s.is_deleted and (@SupplierId::bigint is null or s.id = @SupplierId) order by 4 desc
                     """;

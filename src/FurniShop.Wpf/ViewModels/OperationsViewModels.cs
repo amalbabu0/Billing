@@ -145,7 +145,7 @@ public sealed partial class CustomOrderDetailViewModel(long id) : PageViewModel
 
     public bool IsOpen => Order?.Status is not (CustomOrderStatus.Completed or CustomOrderStatus.Cancelled);
     public bool CanManage => IsOpen && Can(Perm.CustomOrderManage);
-    public string? NextStatus => Order is null ? null : Order.Status is CustomOrderStatus.Received or CustomOrderStatus.Production or CustomOrderStatus.QualityCheck
+    public string? NextStatus => Order is null ? null : Order.Status is CustomOrderStatus.Received or CustomOrderStatus.Design or CustomOrderStatus.Production or CustomOrderStatus.QualityCheck
         ? CustomOrderStatus.Next(Order.Status, Order.RequiresInstallation) : null;
     public string NextLabel => NextStatus is null ? "" : "Move to " + StatusStyle.Label(NextStatus);
     public bool CanInvoice => Order is { InvoiceId: null } o && o.Status is CustomOrderStatus.Ready or CustomOrderStatus.Delivery or CustomOrderStatus.Installation && Can(Perm.InvoiceCreate);

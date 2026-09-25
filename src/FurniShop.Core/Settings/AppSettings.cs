@@ -4,6 +4,8 @@ namespace FurniShop.Core.Settings;
 public sealed class ShopSettings
 {
     public string ShopName { get; set; } = "My Furniture Showroom";
+    /// <summary>Legal name as registered for GST (shown on tax invoices when it differs from the trade name).</summary>
+    public string? LegalName { get; set; }
     public string? Tagline { get; set; } = "Quality furniture for every home";
     public string Address { get; set; } = "";
     public string? City { get; set; }

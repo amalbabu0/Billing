@@ -157,6 +157,7 @@ public class TemplateTests
     {
         Assert.Equal(CustomOrderStatus.Completed, CustomOrderStatus.Next(CustomOrderStatus.Delivery, requiresInstallation: false));
         Assert.Equal(CustomOrderStatus.Installation, CustomOrderStatus.Next(CustomOrderStatus.Delivery, requiresInstallation: true));
-        Assert.Equal(CustomOrderStatus.Production, CustomOrderStatus.Next(CustomOrderStatus.Received, false));
+        Assert.Equal(CustomOrderStatus.Design, CustomOrderStatus.Next(CustomOrderStatus.Received, false));
+        Assert.Equal(CustomOrderStatus.Production, CustomOrderStatus.Next(CustomOrderStatus.Design, false));
     }
 }

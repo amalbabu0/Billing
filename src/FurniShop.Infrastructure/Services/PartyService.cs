@@ -246,7 +246,7 @@ public sealed class CustomerService(Db db, UserSession session, AuditService aud
 public sealed class SupplierService(Db db, UserSession session, AuditService audit)
 {
     private const string Aggregates = """
-        left join (select supplier_id, sum(grand_total) as total from purchases where status = 'COMPLETED' group by supplier_id) pu on pu.supplier_id = s.id
+        left join (select supplier_id, sum(grand_total - returned_total) as total from purchases where status = 'COMPLETED' group by supplier_id) pu on pu.supplier_id = s.id
         left join (select supplier_id, sum(amount) as paid from supplier_payments where not is_voided group by supplier_id) pa on pa.supplier_id = s.id
         """;
 
@@ -345,6 +345,9 @@ public sealed class SupplierService(Db db, UserSession session, AuditService aud
                        'Purchase' || coalesce(' — supplier bill ' || supplier_invoice_no, '') as particulars,
                        0::numeric as debit, grand_total as credit, completed_at as created_at
                 from purchases where supplier_id = @supplierId and status = 'COMPLETED'
+                union all
+                select return_date, 'DEBIT_NOTE', number, id, 'Debit note — goods returned (' || reason || ')', grand_total, 0, created_at
+                from purchase_returns where supplier_id = @supplierId
                 union all
                 select payment_date, 'PAYMENT', number, id, 'Paid by ' || (select name from payment_methods where code = method_code) || coalesce(' — ' || reference, ''),
                        amount, 0, created_at

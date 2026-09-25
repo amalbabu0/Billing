@@ -5,13 +5,21 @@ using FurniShop.Infrastructure.Services;
 
 namespace FurniShop.Infrastructure;
 
-/// <summary>Composition root: one instance per running application (and per test database).</summary>
+/// <summary>
+/// Composition root. The desktop app and CLI create one per process; the web server creates one per request
+/// around a shared <see cref="Database.Db"/> (connection pool) and that request's signed-in <see cref="UserSession"/>.
+/// </summary>
 public sealed class AppServices : IAsyncDisposable
 {
-    public AppServices(string connectionString)
+    private readonly bool _ownsDb;
+
+    public AppServices(string connectionString) : this(new Db(connectionString), new UserSession(), ownsDb: true) { }
+
+    public AppServices(Db db, UserSession session, bool ownsDb = false)
     {
-        Db = new Db(connectionString);
-        Session = new UserSession();
+        _ownsDb = ownsDb;
+        Db = db;
+        Session = session;
         Audit = new AuditService(Db, Session);
         Settings = new SettingsService(Db, Session, Audit);
         Inventory = new InventoryService(Db, Session, Audit, Settings);
@@ -36,6 +44,9 @@ public sealed class AppServices : IAsyncDisposable
         Search = new SearchService(Db, Session);
         Notifications = new NotificationService(Db, Session, Settings);
         Backup = new BackupService(Db, Session, Audit, Settings);
+        Gst = new GstService(Db, Session);
+        PurchaseReturns = new PurchaseReturnService(Db, Session, Audit, Inventory);
+        Workspace = new WorkspaceService(Db, Session, Catalog);
         Documents = new DocumentService(this);
         Migrator = new Migrator(Db);
     }
@@ -66,8 +77,11 @@ public sealed class AppServices : IAsyncDisposable
     public SearchService Search { get; }
     public NotificationService Notifications { get; }
     public BackupService Backup { get; }
+    public GstService Gst { get; }
+    public PurchaseReturnService PurchaseReturns { get; }
+    public WorkspaceService Workspace { get; }
     public DocumentService Documents { get; }
     public Migrator Migrator { get; }
 
-    public ValueTask DisposeAsync() => Db.DisposeAsync();
+    public ValueTask DisposeAsync() => _ownsDb ? Db.DisposeAsync() : ValueTask.CompletedTask;
 }

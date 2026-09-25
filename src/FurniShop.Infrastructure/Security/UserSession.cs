@@ -22,6 +22,10 @@ public sealed class UserSession
     public DateTime LastActivity { get; private set; } = DateTime.UtcNow;
     public IReadOnlyCollection<string> Permissions => _permissions;
 
+    /// <summary>Web requests: the browser's IP and user agent, recorded in the audit log instead of the server's.</summary>
+    public string? ClientIp { get; set; }
+    public string? ClientDevice { get; set; }
+
     public static string MachineName { get; } = SafeMachineName();
     public static string? IpAddress { get; } = LocalIp();
 

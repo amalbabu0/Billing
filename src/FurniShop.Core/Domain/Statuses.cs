@@ -18,6 +18,7 @@ public static class DocType
     public const string Adjustment = "ADJUSTMENT";
     public const string Customer = "CUSTOMER";
     public const string Supplier = "SUPPLIER";
+    public const string DebitNote = "DEBIT_NOTE";
     public const string OnAccount = "ON_ACCOUNT";
 }
 
@@ -59,6 +60,7 @@ public static class SalesOrderStatus
 public static class CustomOrderStatus
 {
     public const string Received = "RECEIVED";
+    public const string Design = "DESIGN";
     public const string Production = "PRODUCTION";
     public const string QualityCheck = "QUALITY_CHECK";
     public const string Ready = "READY";
@@ -66,8 +68,8 @@ public static class CustomOrderStatus
     public const string Installation = "INSTALLATION";
     public const string Completed = "COMPLETED";
     public const string Cancelled = "CANCELLED";
-    public static readonly string[] Flow = { Received, Production, QualityCheck, Ready, Delivery, Installation, Completed };
-    public static readonly string[] All = { Received, Production, QualityCheck, Ready, Delivery, Installation, Completed, Cancelled };
+    public static readonly string[] Flow = { Received, Design, Production, QualityCheck, Ready, Delivery, Installation, Completed };
+    public static readonly string[] All = { Received, Design, Production, QualityCheck, Ready, Delivery, Installation, Completed, Cancelled };
 
     /// <summary>Next status in the production workflow. Installation is skipped when not required.</summary>
     public static string? Next(string current, bool requiresInstallation)
@@ -173,6 +175,7 @@ public static class MovementType
     public const string SaleCancelIn = "SALE_CANCEL_IN";
     public const string PurchaseCancelOut = "PURCHASE_CANCEL_OUT";
     public const string Display = "DISPLAY";
+    public const string PurchaseReturnOut = "PURCHASE_RETURN_OUT";
 }
 
 public static class AdjustmentType
@@ -198,7 +201,7 @@ public static class StatusStyle
             or "SENT" or "LOW_STOCK" or "READY" or "DISPATCHED" or "QUALITY_CHECK" or "UNPAID" => StatusTone.Warning,
         "CANCELLED" or "OVERDUE" or "DAMAGED" or "FAILED" or "REJECTED" or "EXPIRED" or "OUT_OF_STOCK" or "VOID" or "VOIDED"
             or "DISCONTINUED" or "DEFECTIVE" => StatusTone.Error,
-        "CONFIRMED" or "PRODUCTION" or "MANUFACTURING" or "DELIVERY" or "INSTALLATION" or "RECEIVED" => StatusTone.Info,
+        "CONFIRMED" or "DESIGN" or "PRODUCTION" or "MANUFACTURING" or "DELIVERY" or "INSTALLATION" or "RECEIVED" => StatusTone.Info,
         _ => StatusTone.Neutral,
     };
 

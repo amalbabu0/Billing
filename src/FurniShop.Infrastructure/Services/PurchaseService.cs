@@ -164,6 +164,7 @@ public sealed class PurchaseService(Db db, UserSession session, AuditService aud
             var p = await conn.QuerySingleOrDefaultAsync<Purchase>("select * from purchases where id = @id for update", new { id }, tx)
                     ?? throw new NotFoundException("Purchase", id);
             if (p.Status == PurchaseStatus.Cancelled) throw new BusinessRuleException("Already cancelled.");
+            if (p.ReturnedTotal > 0) throw new BusinessRuleException("Goods from this purchase have been returned (debit note issued). It cannot be cancelled.");
             if (p.Status == PurchaseStatus.Completed)
             {
                 var paid = await conn.ExecuteScalarAsync<decimal>("""
@@ -199,7 +200,7 @@ public sealed class PurchaseService(Db db, UserSession session, AuditService aud
             """, new { number, input.SupplierId, Date = input.Date.Date, input.Amount, input.MethodCode, input.Reference, input.Notes, uid = session.UserId }, tx);
 
         var open = (await conn.QueryAsync<(long Id, decimal Balance)>("""
-            select p.id, p.grand_total - coalesce((select sum(a.amount) from supplier_payment_allocations a join supplier_payments sp on sp.id = a.supplier_payment_id and not sp.is_voided
+            select p.id, p.grand_total - p.returned_total - coalesce((select sum(a.amount) from supplier_payment_allocations a join supplier_payments sp on sp.id = a.supplier_payment_id and not sp.is_voided
                                                    where a.purchase_id = p.id), 0) as balance
             from purchases p where p.supplier_id = @SupplierId and p.status = 'COMPLETED' and (@PurchaseId::bigint is null or p.id = @PurchaseId)
             order by coalesce(p.due_date, p.purchase_date), p.id for update of p
@@ -254,7 +255,7 @@ public sealed class PurchaseService(Db db, UserSession session, AuditService aud
             """;
         var args = new { q.From, q.To, q.Status, q.SupplierId, Search = Blank(q.Search), q.PageSize, q.Offset };
         await using var conn = await db.OpenAsync();
-        var sql = $"select * from ({Select} {where}) x {(outstandingOnly ? "where status = 'COMPLETED' and grand_total > paid" : "")}";
+        var sql = $"select * from ({Select} {where}) x {(outstandingOnly ? "where status = 'COMPLETED' and grand_total - returned_total > paid" : "")}";
         var total = await conn.ExecuteScalarAsync<int>($"select count(*) from ({sql}) c", args);
         var rows = await conn.QueryAsync<Purchase>($"{sql} order by purchase_date desc, id desc limit @PageSize offset @Offset", args);
         return new PagedResult<Purchase> { Items = rows.AsList(), TotalCount = total, Page = q.Page, PageSize = q.PageSize };
