@@ -150,6 +150,7 @@ public class GstAndWorkspaceTests(DbFixture f) : IClassFixture<DbFixture>
     {
         await EnsureDemoAsync();
         var o = await f.App.Workspace.OverviewAsync(DateTime.Today.AddDays(-29), DateTime.Today);
+        Assert.Equal(30, (await f.App.Workspace.OverviewAsync(DateTime.Today, DateTime.Today)).Trend.Count); // context trend
         Assert.Equal(30, o.Trend.Count);
         Assert.Equal(o.Sales.Value, o.Trend.Sum(t => t.Sales));
         Assert.Equal(o.Collection.Value, o.Trend.Sum(t => t.Collected));

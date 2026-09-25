@@ -119,7 +119,7 @@ public static partial class Api
         });
 
         auth.MapGet("/me", async (AppServices app, RequestSession rs) =>
-            app.Session.IsAuthenticated ? Results.Ok(await MeAsync(app, rs.MustChangePassword)) : Problem(401, "Please sign in.", "unauthenticated"));
+            app.Session.IsAuthenticated ? Results.Ok(await MeAsync(app, rs.MustChangePassword)) : Results.NoContent());
 
         auth.MapPost("/change-password", async (ChangePasswordRequest r, AppServices app, UserDirectory dir, HttpContext ctx) =>
         {

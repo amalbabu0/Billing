@@ -1,0 +1,121 @@
+/*
+ * FurniShop design tokens — "showroom ledger".
+ * Warm linen canvas, white working surfaces, espresso ink, walnut accent.
+ * Every component reads these variables; nothing hard-codes a colour, size or radius.
+ */
+:root {
+  /* ---- colour: surfaces */
+  --canvas: #f6f4f0;
+  --surface: #ffffff;
+  --surface-sunken: #f2efe9;
+  --surface-hover: #f7f5f1;
+  --surface-selected: #f3ece2;
+  --overlay: rgba(31, 26, 20, 0.36);
+
+  /* ---- colour: ink (text) — all pass WCAG AA on --surface and --canvas */
+  --ink: #1f1a14;
+  --ink-2: #544d44;
+  --ink-3: #736b60;
+  --ink-inverse: #fbf8f3;
+
+  /* ---- colour: lines */
+  --line: #e6e1d8;
+  --line-2: #d3ccc0;
+  --line-focus: #8a4a1f;
+
+  /* ---- colour: brand */
+  --espresso: #1f1a14;       /* primary actions, sidebar */
+  --espresso-2: #2e2720;     /* hover */
+  --espresso-3: #3b332a;
+  --walnut: #8a4a1f;         /* links, focus, selected accents */
+  --walnut-soft: #f4e9dd;
+  --sand: #e9d8bf;           /* brand mark on dark */
+
+  /* ---- colour: sidebar */
+  --nav-bg: #1c1712;
+  --nav-ink: #d8d0c4;
+  --nav-ink-2: #9d9487;
+  --nav-hover: #28211b;
+  --nav-active: #332a22;
+  --nav-accent: #d9a86c;
+
+  /* ---- colour: status (never used alone — always with an icon or label) */
+  --ok: #1e6e45;       --ok-bg: #e6f2ea;      --ok-line: #bcdcc8;
+  --warn: #875600;     --warn-bg: #fbf0d9;    --warn-line: #eed6a3;
+  --bad: #b42318;      --bad-bg: #fcebe9;     --bad-line: #f3c5c0;
+  --info: #1d5aa0;     --info-bg: #e8f0fa;    --info-line: #c3d6ee;
+  --muted: #5e574d;    --muted-bg: #efebe4;   --muted-line: #ddd6ca;
+
+  /* ---- colour: data visualisation (validated categorical order; single series = --viz-1) */
+  --viz-1: #2a78d6; --viz-2: #eb6834; --viz-3: #1baf7a; --viz-4: #eda100;
+  --viz-5: #e87ba4; --viz-6: #008300; --viz-7: #4a3aa7; --viz-8: #e34948;
+  --viz-grid: #ece8e1;
+  --viz-axis: #736b60;
+
+  /* ---- type */
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --text-2xs: 11px;   /* micro labels, table group headers */
+  --text-xs: 12px;    /* captions, badges, helper text */
+  --text-sm: 13px;    /* labels, dense table cells */
+  --text-md: 14px;    /* body, inputs, table cells */
+  --text-lg: 16px;    /* section titles */
+  --text-xl: 20px;    /* drawer / modal titles */
+  --text-2xl: 24px;   /* page titles */
+  --text-3xl: 28px;   /* KPI values */
+  --text-4xl: 36px;   /* POS grand total */
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --leading-tight: 1.2;
+  --leading: 1.45;
+  --tracking-caps: 0.06em;
+
+  /* ---- space (4px grid) */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px; --s-8: 32px; --s-10: 40px; --s-12: 48px;
+
+  /* ---- shape */
+  --radius-xs: 4px;   /* badges, chips */
+  --radius-sm: 6px;   /* inputs, buttons */
+  --radius-md: 8px;   /* menus, small cards */
+  --radius-lg: 10px;  /* cards, panels */
+  --radius-xl: 14px;  /* modals */
+  --radius-pill: 999px;
+
+  /* ---- depth: hairlines first, shadow only for things that float */
+  --shadow-xs: 0 1px 2px rgba(31, 26, 20, 0.05);
+  --shadow-sm: 0 1px 3px rgba(31, 26, 20, 0.08), 0 1px 2px rgba(31, 26, 20, 0.04);
+  --shadow-md: 0 8px 24px rgba(31, 26, 20, 0.12), 0 2px 6px rgba(31, 26, 20, 0.06);
+  --shadow-lg: 0 24px 60px rgba(31, 26, 20, 0.22);
+  --ring: 0 0 0 3px rgba(138, 74, 31, 0.22);
+
+  /* ---- controls */
+  --control-sm: 30px;
+  --control: 36px;
+  --control-lg: 44px;
+  --control-xl: 52px;  /* POS pay buttons */
+  --row: 46px;         /* table row, comfortable */
+  --row-compact: 36px;
+  --icon-sm: 14px; --icon: 16px; --icon-md: 18px; --icon-lg: 20px; --icon-xl: 28px;
+
+  /* ---- layout */
+  --sidebar: 244px;
+  --sidebar-collapsed: 64px;
+  --topbar: 56px;
+  --content-max: 1480px;
+  --drawer: 560px;
+  --drawer-wide: 760px;
+
+  /* ---- motion */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --fast: 120ms;
+  --base: 180ms;
+  --slow: 260ms;
+
+  /* ---- z */
+  --z-sticky: 5; --z-nav: 30; --z-popover: 50; --z-drawer: 60; --z-modal: 70; --z-toast: 80;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --fast: 0ms; --base: 0ms; --slow: 0ms; }
+}

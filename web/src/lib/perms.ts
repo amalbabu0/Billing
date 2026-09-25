@@ -1,0 +1,21 @@
+/** Permission codes (must match the server's Perm class). The UI hides what a role cannot do; the server enforces it. */
+export const P = {
+  DashboardView: 'dashboard.view',
+  InvoiceView: 'invoice.view', InvoiceCreate: 'invoice.create', InvoiceDiscount: 'invoice.discount', InvoiceCancel: 'invoice.cancel',
+  QuotationView: 'quotation.view', QuotationManage: 'quotation.manage',
+  SalesOrderView: 'salesorder.view', SalesOrderManage: 'salesorder.manage',
+  PaymentView: 'payment.view', PaymentReceive: 'payment.receive', PaymentVoid: 'payment.void', PaymentRefund: 'payment.refund',
+  ReturnView: 'return.view', ReturnManage: 'return.manage',
+  CustomerView: 'customer.view', CustomerManage: 'customer.manage', CustomerDelete: 'customer.delete',
+  ProductView: 'product.view', ProductManage: 'product.manage', ProductDelete: 'product.delete', CostView: 'cost.view',
+  InventoryView: 'inventory.view', InventoryAdjust: 'inventory.adjust',
+  PurchaseView: 'purchase.view', PurchaseManage: 'purchase.manage',
+  SupplierView: 'supplier.view', SupplierManage: 'supplier.manage', SupplierPay: 'supplier.pay',
+  CustomOrderView: 'customorder.view', CustomOrderManage: 'customorder.manage',
+  DeliveryView: 'delivery.view', DeliveryManage: 'delivery.manage',
+  InstallationView: 'installation.view', InstallationManage: 'installation.manage',
+  ExpenseView: 'expense.view', ExpenseManage: 'expense.manage',
+  ReportSales: 'report.sales', ReportInventory: 'report.inventory', ReportPurchase: 'report.purchase', ReportPayment: 'report.payment',
+  ReportGst: 'report.gst', ReportProfit: 'report.profit', ExportData: 'export.data',
+  UserManage: 'user.manage', RoleManage: 'role.manage', AuditView: 'audit.view', SettingsManage: 'settings.manage', BackupManage: 'backup.manage',
+} as const;

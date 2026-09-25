@@ -41,6 +41,7 @@ public sealed class Overview
     public DateTime From { get; set; }
     public DateTime To { get; set; }
     public string Granularity { get; set; } = "day";
+    public DateTime TrendFrom { get; set; }
     public KpiValue Sales { get; set; } = new();
     public KpiValue Collection { get; set; } = new();
     public KpiValue Outstanding { get; set; } = new();
@@ -171,7 +172,7 @@ public sealed class DocumentPreview
 public sealed class WorkspaceService(Db db, UserSession session, CatalogService catalog)
 {
     // ------------------------------------------------------------------ dashboard
-    public async Task<Overview> OverviewAsync(DateTime from, DateTime to)
+    public async Task<Overview> OverviewAsync(DateTime from, DateTime to, bool contextTrend = true)
     {
         session.Demand(Perm.DashboardView);
         from = from.Date; to = to.Date;
@@ -181,9 +182,12 @@ public sealed class WorkspaceService(Db db, UserSession session, CatalogService 
         var prevFrom = prevTo.AddDays(-(days - 1));
         var granularity = days > 92 ? "month" : "day";
         var a = new { From = from, To = to, PrevFrom = prevFrom, PrevTo = prevTo };
+        // A one-day view still shows the last 30 days as context for the trend chart.
+        var trendFrom = contextTrend && days < 7 ? to.AddDays(-29) : from;
+        var t = new { From = trendFrom, To = to };
 
         await using var conn = await db.OpenAsync();
-        var o = new Overview { From = from, To = to, Granularity = granularity };
+        var o = new Overview { From = from, To = to, Granularity = granularity, TrendFrom = trendFrom };
         var k = await conn.QuerySingleAsync<(decimal Sales, int Invoices, decimal PrevSales, decimal Collected, decimal PrevCollected,
             decimal Outstanding, int OutstandingCount, decimal Overdue, int PendingDeliveries, int DeliveriesToday, int PendingOrders, int CustomOrders)>("""
             select
@@ -218,7 +222,7 @@ public sealed class WorkspaceService(Db db, UserSession session, CatalogService 
                    coalesce((select sum(case when direction='IN' then amount else -amount end) from payments p where not p.is_voided
                              and date_trunc('{granularity}', p.payment_date) = g.date and p.payment_date between @From and @To),0) as collected
             from g order by g.date
-            """, a)).AsList();
+            """, t)).AsList();
 
         if (session.Has(Perm.DeliveryView))
             o.UpcomingDeliveries = (await conn.QueryAsync<Delivery>("""

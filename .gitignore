@@ -6,3 +6,5 @@ obj/
 TestResults/
 publish/
 appsettings.local.json
+web/node_modules/
+src/FurniShop.Web/wwwroot/

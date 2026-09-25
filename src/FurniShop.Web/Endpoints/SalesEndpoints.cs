@@ -43,6 +43,22 @@ public static partial class Api
     {
         // ---------------- invoices
         api.MapGet("/invoices", async (QueryOf<ListQuery> lq, string? paymentState, AppServices app) => await app.Invoices.ListAsync(lq.Value.Clamp(), paymentState));
+        api.MapGet("/invoices/summary", async (DateTime? from, DateTime? to, long? customerId, AppServices app) =>
+        {
+            app.Session.Demand(Perm.InvoiceView);
+            return await app.Db.QuerySingleOrDefaultAsync<InvoiceSummary>("""
+                select count(*) filter (where i.status = 'FINAL')::int as count,
+                       coalesce(sum(i.grand_total) filter (where i.status = 'FINAL'), 0) as total,
+                       coalesce(sum(b.paid), 0) as paid,
+                       coalesce(sum(b.balance) filter (where b.balance > 0), 0) as balance,
+                       coalesce(sum(b.balance) filter (where b.balance > 0 and i.due_date < current_date), 0) as overdue,
+                       count(*) filter (where i.status = 'DRAFT')::int as drafts,
+                       count(*) filter (where i.status = 'CANCELLED')::int as cancelled
+                from invoices i left join v_invoice_balances b on b.invoice_id = i.id
+                where (@from::date is null or i.invoice_date >= @from::date) and (@to::date is null or i.invoice_date <= @to::date)
+                  and (@customerId::bigint is null or i.customer_id = @customerId)
+                """, new { from, to, customerId });
+        });
         api.MapGet("/invoices/{id:long}", async (long id, AppServices app) =>
         {
             var inv = await app.Invoices.GetAsync(id);
@@ -182,5 +198,16 @@ public static partial class Api
             var (mobile, message) = await app.Documents.ReceiptMessageAsync(id);
             return WhatsApp(await app.Settings.GetAsync(), mobile, message);
         });
+    }
+
+    public sealed class InvoiceSummary
+    {
+        public int Count { get; set; }
+        public decimal Total { get; set; }
+        public decimal Paid { get; set; }
+        public decimal Balance { get; set; }
+        public decimal Overdue { get; set; }
+        public int Drafts { get; set; }
+        public int Cancelled { get; set; }
     }
 }
