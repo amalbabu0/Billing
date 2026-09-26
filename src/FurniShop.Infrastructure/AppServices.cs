@@ -49,12 +49,18 @@ public sealed class AppServices : IAsyncDisposable
         Workspace = new WorkspaceService(Db, Session, Catalog);
         Locations = new LocationService(Db, Session, Audit, Inventory);
         Production = new ProductionService(Db, Session, Audit, Inventory);
+        ServiceDesk = new ServiceDeskService(Db, Session, Audit, Invoices);
+        Crm = new CrmService(Db, Session, Audit, Customers);
+        Cash = new CashRegisterService(Db, Session, Audit);
         Documents = new DocumentService(this);
         Migrator = new Migrator(Db);
     }
 
     public LocationService Locations { get; }
     public ProductionService Production { get; }
+    public ServiceDeskService ServiceDesk { get; }
+    public CrmService Crm { get; }
+    public CashRegisterService Cash { get; }
     public Db Db { get; }
     public UserSession Session { get; }
     public AuditService Audit { get; }

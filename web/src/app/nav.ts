@@ -1,5 +1,5 @@
 import {
-  BarChart3, Boxes, ClipboardList, Factory, Hammer, IndianRupee, LayoutDashboard, Package, Receipt, Settings, ShoppingBag, Truck, UserCog, Users, Wallet, Wrench,
+  BarChart3, Boxes, ClipboardList, Factory, Hammer, LifeBuoy, IndianRupee, LayoutDashboard, Package, Receipt, Settings, ShoppingBag, Truck, UserCog, Users, Wallet, Wrench,
   type LucideIcon,
 } from 'lucide-react';
 import { P } from '@/lib/perms';
@@ -17,6 +17,7 @@ export const NAV: NavGroup[] = [
       { label: 'Quotations', to: '/sales/quotations', perms: [P.QuotationView] },
       { label: 'Sales orders', to: '/sales/orders', perms: [P.SalesOrderView] },
       { label: 'Payments', to: '/sales/payments', perms: [P.PaymentView] },
+      { label: 'Cash register', to: '/cash', perms: [P.CashManage, P.CashApprove] },
       { label: 'Sales returns', to: '/sales/returns', perms: [P.ReturnView] },
       { label: 'Exchanges', to: '/sales/exchanges', perms: [P.ReturnView] },
     ],
@@ -26,6 +27,8 @@ export const NAV: NavGroup[] = [
       { label: 'Customers', to: '/customers', perms: [P.CustomerView], end: true },
       { label: 'Customer ledger', to: '/customers/ledger', perms: [P.CustomerView] },
       { label: 'Outstanding payments', to: '/customers/outstanding', perms: [P.CustomerView, P.InvoiceView] },
+      { label: 'Leads', to: '/crm/leads', perms: [P.LeadView] },
+      { label: 'Follow-ups', to: '/crm/follow-ups', perms: [P.LeadView, P.CustomerView] },
     ],
   },
   {
@@ -86,6 +89,12 @@ export const NAV: NavGroup[] = [
     ],
   },
   { label: 'Installation', icon: Wrench, to: '/installation', perms: [P.InstallationView] },
+  {
+    label: 'Service', icon: LifeBuoy, children: [
+      { label: 'Service tickets', to: '/service/tickets', perms: [P.ServiceView] },
+      { label: 'Warranties', to: '/service/warranties', perms: [P.WarrantyView, P.ServiceView] },
+    ],
+  },
   {
     label: 'GST & Tax', icon: IndianRupee, children: [
       { label: 'GST dashboard', to: '/gst', perms: [P.ReportGst], end: true },

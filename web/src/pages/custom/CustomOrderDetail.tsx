@@ -62,7 +62,7 @@ export default function CustomOrderDetail() {
       <PageHeader crumbs={[{ label: 'Custom orders', to: '/custom-orders' }, { label: o.number }]}
         title={<span>{o.productType} <span className="doc-no muted" style={{ fontSize: 16 }}>{o.number}</span></span>}
         badge={<Status value={o.status} text={CUSTOM_ORDER_LABELS[o.status]} />}
-        desc={<><Link to={`/customers/${o.customerId}`}>{o.customerName}</Link> · ordered {date(o.orderDate)} · {o.expectedCompletionDate ? <span className={days !== null && days < 0 && !cancelled && o.status !== 'COMPLETED' ? 't-bad' : ''}>due {date(o.expectedCompletionDate)}{days !== null && days < 0 && !cancelled && o.status !== 'COMPLETED' ? ` (${-days} days late)` : ''}</span> : 'no due date'}</>}
+        desc={<><Link to={`/customers/${o.customerId}`}>{o.customerName}</Link> · ordered {date(o.orderDate)} · {o.expectedCompletionDate ? <span className={days !== null && days < 0 && !cancelled && o.status !== 'COMPLETED' ? 't-bad' : ''}>due {date(o.expectedCompletionDate)}{days !== null && days < 0 && !cancelled && o.status !== 'COMPLETED' ? ` (${-days} day${days === -1 ? "" : "s"} late)` : ''}</span> : 'no due date'}</>}
         actions={!cancelled && <>
           {next && can(P.CustomOrderManage) && <button className="btn btn-primary" onClick={() => setNote({ open: true, text: '' })}><ArrowRight aria-hidden />Move to {CUSTOM_ORDER_LABELS[next]}</button>}
           {o.status === 'READY' && !o.invoiceId && can(P.InvoiceCreate) && <button className="btn btn-primary" onClick={() => setInvoice(true)}><Receipt aria-hidden />Generate invoice</button>}

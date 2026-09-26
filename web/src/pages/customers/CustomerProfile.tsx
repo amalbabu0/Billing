@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowLeftRight, FilePlus2, Hammer, IndianRupee, Mail, MapPin, MessageCircle, Pencil, Phone, Receipt, RotateCcw, Truck, Undo2, Wallet, FileText, ClipboardList,
+  ArrowLeftRight, FilePlus2, Hammer, IndianRupee, LifeBuoy, Plus, ShieldCheck, Mail, MapPin, MessageCircle, Pencil, Phone, Receipt, RotateCcw, Truck, Undo2, Wallet, FileText, ClipboardList,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { date, dateTime, label, money, relative } from '@/lib/format';
 import { P } from '@/lib/perms';
-import type { CustomOrder, Customer, CustomerSummary, Delivery, InvoiceRow, LedgerEntry, Paged, Payment, SalesOrder, SalesReturn } from '@/lib/types';
-import { toneOf } from '@/lib/status';
+import type { CustomOrder, Customer, CustomerSummary, Delivery, FollowUp, InvoiceRow, LedgerEntry, Paged, Payment, SalesOrder, SalesReturn, ServiceTicket, WarrantyRecord } from '@/lib/types';
+import { SERVICE_LABELS, toneOf, WARRANTY_LABELS, WARRANTY_TONE } from '@/lib/status';
 import { useCan } from '@/app/providers';
 import { Avatar, Badge, Card, DocNo, EmptyState, ErrorPanel, Kpi, Money, PageHeader, SkeletonRows, Status, Tabs, Timeline } from '@/components/ui/display';
 import { Menu } from '@/components/ui/overlay';
@@ -19,8 +19,9 @@ import { RefundDialog } from '@/components/RefundDialog';
 import { WhatsAppDialog } from '@/components/DocActions';
 import { customerStatus } from './Customers';
 import { LedgerTable } from './CustomerLedger';
+import { AddFollowUpModal, FollowUpList } from '../crm/Crm';
 
-type Tab = 'overview' | 'invoices' | 'payments' | 'orders' | 'deliveries' | 'returns' | 'ledger';
+type Tab = 'overview' | 'invoices' | 'payments' | 'orders' | 'deliveries' | 'returns' | 'service' | 'followups' | 'ledger';
 const KIND_ICON: Record<string, typeof Receipt> = { INVOICE: Receipt, PAYMENT: Wallet, REFUND: Undo2, QUOTATION: FileText, SALES_ORDER: ClipboardList, CUSTOM_ORDER: Hammer, DELIVERY: Truck, RETURN: RotateCcw };
 const KIND_ROUTE: Record<string, string> = { INVOICE: '/sales/invoices/', QUOTATION: '/sales/quotations/', SALES_ORDER: '/sales/orders/', CUSTOM_ORDER: '/custom-orders/', DELIVERY: '/delivery/all?open=' };
 
@@ -67,6 +68,7 @@ export default function CustomerProfile() {
             { label: 'New sales order', icon: <ClipboardList />, onClick: () => nav(`/sales/orders/new?customerId=${c.id}`), hidden: !can(P.SalesOrderManage) },
             { label: 'New custom order', icon: <Hammer />, onClick: () => nav(`/custom-orders/new?customerId=${c.id}`), hidden: !can(P.CustomOrderManage) },
             { label: 'Refund advance', icon: <Undo2 />, onClick: () => setRefund(true), hidden: !can(P.PaymentRefund) || !(s?.advanceAmount && s.advanceAmount > 0) },
+            { label: 'New service ticket', icon: <LifeBuoy />, onClick: () => nav(`/service/tickets?customer=${c.id}`), hidden: !can(P.ServiceManage) || c.isWalkIn },
             { label: 'Edit details', icon: <Pencil />, onClick: () => setEdit(true), hidden: !can(P.CustomerManage) || c.isWalkIn },
           ]} />
         </>} />
@@ -84,6 +86,7 @@ export default function CustomerProfile() {
         { value: 'overview', label: 'Overview' }, { value: 'invoices', label: 'Invoices', hidden: !can(P.InvoiceView) },
         { value: 'payments', label: 'Payments', hidden: !can(P.PaymentView) }, { value: 'orders', label: 'Orders', hidden: !can(P.SalesOrderView, P.CustomOrderView) },
         { value: 'deliveries', label: 'Deliveries', hidden: !can(P.DeliveryView) }, { value: 'returns', label: 'Returns', hidden: !can(P.ReturnView) },
+        { value: 'service', label: 'Warranty & service', hidden: !can(P.WarrantyView, P.ServiceView) }, { value: 'followups', label: 'Follow-ups', hidden: !can(P.LeadView, P.CustomerView) },
         { value: 'ledger', label: 'Ledger' },
       ]} />
 
@@ -93,6 +96,8 @@ export default function CustomerProfile() {
       {tab === 'orders' && <OrdersTab customerId={cid} />}
       {tab === 'deliveries' && <DeliveriesTab customerId={cid} />}
       {tab === 'returns' && <ReturnsTab customerId={cid} />}
+      {tab === 'service' && <ServiceTab customerId={cid} />}
+      {tab === 'followups' && <FollowUpsTab customerId={cid} />}
       {tab === 'ledger' && <LedgerTab customerId={cid} />}
 
       <CustomerDrawer open={edit} customer={c} onClose={() => setEdit(false)} />
@@ -229,5 +234,43 @@ function LedgerTab({ customerId }: { customerId: number }) {
       <LedgerTable entries={data} loading={isLoading} />
       <p className="text-xs muted">Updated {dateTime(new Date())}</p>
     </div>
+  );
+}
+
+function ServiceTab({ customerId }: { customerId: number }) {
+  const nav = useNavigate();
+  const w = useCustomerList<WarrantyRecord>('warranties', '/api/warranties', customerId);
+  const t = useCustomerList<ServiceTicket>('service', '/api/service', customerId);
+  return (
+    <div className="stack gap-4">
+      <DataTable id="cust-war" label="Warranties" rowKey={r => r.id} {...w} onRowClick={r => nav(`/service/warranties?open=${r.id}`)} empty={<EmptyState compact icon={<ShieldCheck />} title="No warranties" />}
+        columns={[
+          { key: 'n', header: 'Warranty', fixed: true, mobile: 'title', render: r => <DocNo>{r.number}</DocNo> },
+          { key: 'p', header: 'Product', mobile: 'sub', render: r => <>{r.productName}{r.serialNo && <span className="mono text-xs muted"> · {r.serialNo}</span>}</> },
+          { key: 'e', header: 'Valid until', mobile: 'meta', render: r => date(r.endDate) },
+          { key: 's', header: 'Status', mobile: 'right', render: r => <Status value={r.state} tone={WARRANTY_TONE[r.state]} text={WARRANTY_LABELS[r.state]} /> },
+        ]} />
+      <DataTable id="cust-srv" label="Service tickets" rowKey={r => r.id} {...t} onRowClick={r => nav(`/service/tickets?open=${r.id}`)} empty={<EmptyState compact icon={<LifeBuoy />} title="No service tickets" />}
+        columns={[
+          { key: 'n', header: 'Ticket', fixed: true, mobile: 'title', render: r => <DocNo>{r.number}</DocNo> },
+          { key: 'p', header: 'Product / issue', mobile: 'sub', render: r => <div className="cell-stack"><span className="cell-title">{r.productName}</span><span className="cell-sub">{r.issue}</span></div> },
+          { key: 'd', header: 'Opened', mobile: 'meta', render: r => date(r.createdAt) },
+          { key: 's', header: 'Status', mobile: 'right', render: r => <Status value={r.status} text={SERVICE_LABELS[r.status]} /> },
+        ]} />
+    </div>
+  );
+}
+
+function FollowUpsTab({ customerId }: { customerId: number }) {
+  const can = useCan();
+  const qc = useQueryClient();
+  const [add, setAdd] = useState(false);
+  const { data = [], isLoading } = useQuery({ queryKey: ['follow-ups', 'customer', customerId], queryFn: () => api.get<FollowUp[]>('/api/follow-ups', { scope: 'all', customerId }) });
+  const refresh = () => qc.invalidateQueries({ queryKey: ['follow-ups'] });
+  return (
+    <Card title="Follow-ups" actions={can(P.CustomerManage) && <button className="btn btn-sm" onClick={() => setAdd(true)}><Plus aria-hidden />Add</button>}>
+      {isLoading ? <SkeletonRows rows={3} /> : <FollowUpList items={data} compact onChanged={refresh} />}
+      {add && <AddFollowUpModal refType="CUSTOMER" refId={customerId} defaultTitle="Call about new requirement" onClose={() => setAdd(false)} onDone={refresh} />}
+    </Card>
   );
 }

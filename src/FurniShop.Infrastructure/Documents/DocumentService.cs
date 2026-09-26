@@ -257,7 +257,21 @@ public sealed class DocumentService(AppServices app)
         v["number"] = $"{o.Number} (custom {o.ProductType})"; v["total"] = Money.Format(o.FinalPrice > 0 ? o.FinalPrice : o.EstimatedCost);
         v["paid"] = Money.Format(o.AdvancePaid); v["balance"] = Money.Format(o.Balance);
         v["date"] = o.ExpectedCompletionDate?.ToString("dd-MMM-yyyy") ?? "to be confirmed";
-        return (c.Whatsapp ?? c.Mobile ?? "", MessageTemplates.Render(s.WhatsApp.OrderConfirmationTemplate, v));
+        v["product"] = o.ProductType;
+        // Once the piece is finished, the "production ready" message is the useful one.
+        var ready = o.Status is CustomOrderStatus.Ready or CustomOrderStatus.QualityCheck;
+        if (ready) v["number"] = o.Number;
+        return (c.Whatsapp ?? c.Mobile ?? "", MessageTemplates.Render(ready ? s.WhatsApp.ProductionReadyTemplate : s.WhatsApp.OrderConfirmationTemplate, v));
+    }
+
+    public async Task<(string Mobile, string Message)> WarrantyReminderMessageAsync(long warrantyId)
+    {
+        var s = await app.Settings.GetAsync();
+        var w = await app.ServiceDesk.WarrantyAsync(warrantyId);
+        var c = await app.Customers.GetAsync(w.CustomerId);
+        var v = Base(s, c.Name);
+        v["number"] = w.Number; v["product"] = w.ProductName; v["end_date"] = w.EndDate.ToString("dd-MMM-yyyy");
+        return (c.Whatsapp ?? c.Mobile ?? "", MessageTemplates.Render(s.WhatsApp.WarrantyReminderTemplate, v));
     }
 
     public async Task<(string Mobile, string Message)> ReceiptMessageAsync(long paymentId)
@@ -280,6 +294,11 @@ public sealed class DocumentService(AppServices app)
         var v = Base(s, c.Name);
         v["number"] = d.Number; v["date"] = d.ScheduledDate?.ToString("dd-MMM-yyyy") ?? "-"; v["slot"] = d.TimeSlot; v["driver"] = d.DriverName;
         v["vehicle"] = string.IsNullOrWhiteSpace(d.VehicleNo) ? "" : $"({d.VehicleNo})"; v["otp"] = otp ?? "shared separately";
+        if (d.Status == DeliveryStatus.Delivered)
+        {
+            v["date"] = d.DeliveredAt?.ToString("dd-MMM-yyyy"); v["receiver"] = d.ReceiverName;
+            return (d.ContactMobile ?? c.Whatsapp ?? c.Mobile ?? "", MessageTemplates.Render(s.WhatsApp.DeliveryCompletedTemplate, v));
+        }
         return (d.ContactMobile ?? c.Whatsapp ?? c.Mobile ?? "", MessageTemplates.Render(s.WhatsApp.DeliveryTemplate, v));
     }
 

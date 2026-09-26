@@ -167,6 +167,8 @@ export default function Pos() {
 
   // ---------------------------------------------------------------- save
   const reset = () => { setBill({ ...blankBill(), customer: walkIn.data ?? null }); setTab('add'); if (draftId) nav('/pos', { replace: true }); searchRef.current?.focus(); };
+  // Reason given by an authorised user to bill past the customer's credit limit (asked only when the server refuses).
+  const creditOverride = useRef<string | null>(null);
   const checkout = useMutation({
     mutationFn: async (mode: 'print' | 'save' | 'whatsapp') => {
       if (!docInput) throw new Error('Add at least one item.');
@@ -179,8 +181,9 @@ export default function Pos() {
       }
       const res = await api.post<CheckoutResult>('/api/invoices/checkout', {
         document: { ...docInput, dueDate: balance > 0 ? bill.dueDate || iso(addDays(new Date(), defaults?.defaultDueDays ?? 15)) : undefined },
-        payments: payments.filter(p => p.amount > 0), useAdvance: advanceUsed,
+        payments: payments.filter(p => p.amount > 0), useAdvance: advanceUsed, creditOverride: creditOverride.current,
       });
+      creditOverride.current = null;
       return { res, mode };
     },
     onSuccess: ({ res, mode }) => {
@@ -194,7 +197,15 @@ export default function Pos() {
       if (mode === 'whatsapp') setWa(res.invoiceId);
       reset();
     },
-    onError: e => toast.error('Invoice not saved', errorMessage(e)),
+    onError: async (e, mode) => {
+      creditOverride.current = null;
+      if (e instanceof ApiError && e.code === 'credit_limit_overridable') {
+        const reason = await confirm({ title: 'Credit limit exceeded', message: e.message, confirmText: 'Approve extra credit', tone: 'warn', reason: { label: 'Reason for approving', placeholder: 'Regular customer, cheque promised on…', required: true } });
+        if (reason) { creditOverride.current = reason; checkout.mutate(mode); }
+        return;
+      }
+      toast.error(e instanceof ApiError && e.code === 'credit_limit' ? 'Credit limit exceeded' : 'Invoice not saved', errorMessage(e));
+    },
   });
   const saveDraft = useMutation({
     mutationFn: () => api.post<{ id: number }>('/api/invoices/draft', docInput),
@@ -293,6 +304,11 @@ export default function Pos() {
               {bill.customer && !isWalkIn && bill.customer.outstanding > 0 && (
                 <div className="text-xs t-bad">Previous balance due: {money(bill.customer.outstanding)}</div>
               )}
+              {bill.customer && !isWalkIn && bill.customer.creditLimit > 0 && (() => {
+                const available = bill.customer.creditLimit - Math.max(0, bill.customer.outstanding);
+                const after = available - Math.max(0, balance);
+                return <div className={`text-xs ${after < 0 ? 't-bad medium' : 'muted'}`}>Credit limit {money(bill.customer.creditLimit, { decimals: false })} · available {money(Math.max(0, available), { decimals: false })}{after < 0 && balance > 0 ? ' — this bill goes over the limit' : ''}</div>;
+              })()}
               {preview.data?.placeOfSupplyName && <div className="text-xs muted">Place of supply: {preview.data.placeOfSupplyName}</div>}
             </div>
 

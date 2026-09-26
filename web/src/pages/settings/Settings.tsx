@@ -386,9 +386,11 @@ function PrinterSection({ data }: { data: SettingsResponse }) {
 // ------------------------------------------------------------ WhatsApp
 const TEMPLATES = [
   { key: 'quotationTemplate', label: 'Quotation' }, { key: 'invoiceTemplate', label: 'Invoice' }, { key: 'receiptTemplate', label: 'Payment receipt' },
-  { key: 'reminderTemplate', label: 'Payment reminder' }, { key: 'orderConfirmationTemplate', label: 'Order confirmation' }, { key: 'deliveryTemplate', label: 'Delivery scheduled' },
+  { key: 'reminderTemplate', label: 'Payment reminder' }, { key: 'orderConfirmationTemplate', label: 'Order confirmation' }, { key: 'productionReadyTemplate', label: 'Production ready' },
+  { key: 'deliveryTemplate', label: 'Delivery scheduled' }, { key: 'deliveryCompletedTemplate', label: 'Delivery completed' }, { key: 'warrantyReminderTemplate', label: 'Warranty reminder' },
+  { key: 'serviceUpdateTemplate', label: 'Service update' },
 ];
-const PLACEHOLDERS = ['customer', 'shop', 'shop_phone', 'number', 'total', 'paid', 'balance', 'amount', 'method', 'date', 'due_date', 'valid_until', 'slot', 'driver', 'vehicle', 'otp'];
+const PLACEHOLDERS = ['customer', 'shop', 'shop_phone', 'number', 'total', 'paid', 'balance', 'amount', 'method', 'date', 'due_date', 'valid_until', 'slot', 'driver', 'vehicle', 'otp', 'product', 'status', 'technician', 'receiver', 'end_date'];
 
 function WhatsAppSection({ data }: { data: SettingsResponse }) {
   const w = useSection('whatsapp', data.settings.whatsApp);

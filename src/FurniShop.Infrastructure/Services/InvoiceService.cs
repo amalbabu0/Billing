@@ -90,24 +90,25 @@ public sealed class InvoiceService(Db db, UserSession session, AuditService audi
 
     // ------------------------------------------------------------------ finalise / checkout
     /// <summary>POS checkout: save the invoice, finalise it and record the payment in one transaction.</summary>
-    public async Task<CheckoutResult> CheckoutAsync(SalesDocumentInput input, IReadOnlyList<PaymentLineInput> paymentLines, decimal useAdvance = 0)
+    public async Task<CheckoutResult> CheckoutAsync(SalesDocumentInput input, IReadOnlyList<PaymentLineInput> paymentLines, decimal useAdvance = 0, string? creditOverride = null)
     {
         session.Demand(Perm.InvoiceCreate);
         return await db.InTransactionAsync(async (conn, tx) =>
         {
             var id = await SaveDraftAsync(conn, tx, input);
-            return await FinalizeAsync(conn, tx, id, paymentLines, useAdvance);
+            return await FinalizeAsync(conn, tx, id, paymentLines, useAdvance, creditOverride: creditOverride);
         });
     }
 
-    public async Task<CheckoutResult> FinalizeAsync(long invoiceId, IReadOnlyList<PaymentLineInput> paymentLines, decimal useAdvance = 0)
+    public async Task<CheckoutResult> FinalizeAsync(long invoiceId, IReadOnlyList<PaymentLineInput> paymentLines, decimal useAdvance = 0, string? creditOverride = null)
     {
         session.Demand(Perm.InvoiceCreate);
-        return await db.InTransactionAsync(async (conn, tx) => await FinalizeAsync(conn, tx, invoiceId, paymentLines, useAdvance));
+        return await db.InTransactionAsync(async (conn, tx) => await FinalizeAsync(conn, tx, invoiceId, paymentLines, useAdvance, creditOverride: creditOverride));
     }
 
+    /// <param name="creditOverride">Reason given by a user with <see cref="Perm.CreditOverride"/> to bill past the customer's credit limit.</param>
     internal async Task<CheckoutResult> FinalizeAsync(NpgsqlConnection conn, NpgsqlTransaction tx, long invoiceId,
-        IReadOnlyList<PaymentLineInput> paymentLines, decimal useAdvance, long? creditFromInvoiceId = null)
+        IReadOnlyList<PaymentLineInput> paymentLines, decimal useAdvance, long? creditFromInvoiceId = null, string? creditOverride = null)
     {
         var s = await SettingsService.LoadAsync(conn, tx);
         var inv = await conn.QuerySingleOrDefaultAsync<Invoice>("select *, invoice_date as date from invoices where id = @invoiceId for update", new { invoiceId }, tx)
@@ -192,14 +193,29 @@ public sealed class InvoiceService(Db db, UserSession session, AuditService audi
             {
                 var outstanding = await conn.ExecuteScalarAsync<decimal>(
                     "select coalesce(sum(balance),0) from v_invoice_balances where customer_id = @CustomerId and balance > 0", inv, tx);
-                if (outstanding > customer.CreditLimit && !session.IsAdmin)
-                    throw new BusinessRuleException($"Credit limit of {Money.Format(customer.CreditLimit)} exceeded (outstanding would be {Money.Format(outstanding)}). An admin must approve.");
+                if (outstanding > customer.CreditLimit)
+                {
+                    var canOverride = session.Has(Perm.CreditOverride);
+                    if (!canOverride || string.IsNullOrWhiteSpace(creditOverride))
+                        throw new CreditLimitException(
+                            $"{customer.Name}'s credit limit is {Money.Format(customer.CreditLimit)}; with this bill they would owe {Money.Format(outstanding)}. " +
+                            (canOverride ? "Enter a reason to approve the extra credit." : "Take more payment now, or ask a manager to approve."),
+                            customer.CreditLimit, outstanding, canOverride);
+                    await conn.ExecuteAsync("update invoices set credit_override_reason = @reason, credit_override_by = @uid where id = @invoiceId",
+                        new { reason = creditOverride.Trim(), uid = session.UserId, invoiceId }, tx);
+                    await audit.LogAsync(conn, tx, "CREDIT_OVERRIDE", "Sales",
+                        $"approved credit beyond limit on {number} for {customer.Name} — owes {Money.Format(outstanding)} against a limit of {Money.Format(customer.CreditLimit)}: {creditOverride.Trim()}",
+                        "invoice", invoiceId, number);
+                }
             }
             if (inv.DueDate is null)
                 await conn.ExecuteAsync("update invoices set due_date = invoice_date + @days where id = @invoiceId", new { days = s.Invoice.DefaultDueDays, invoiceId }, tx);
         }
 
-        // 5. Links back to the source documents.
+        // 5. Warranty registrations for products that carry a warranty.
+        await ServiceDeskService.RegisterForInvoiceAsync(conn, tx, invoiceId);
+
+        // 6. Links back to the source documents.
         if (inv.SalesOrderId.HasValue)
             await conn.ExecuteAsync("update sales_orders set invoice_id = @invoiceId, updated_at = now() where id = @SalesOrderId", new { invoiceId, inv.SalesOrderId }, tx);
         if (inv.CustomOrderId.HasValue)
@@ -209,7 +225,7 @@ public sealed class InvoiceService(Db db, UserSession session, AuditService audi
             where invoice_id is null and ((sales_order_id = @SalesOrderId) or (custom_order_id = @CustomOrderId))
             """, new { invoiceId, inv.SalesOrderId, inv.CustomOrderId }, tx);
 
-        // 6. Delivery (direct sales only — orders create their delivery from the order screen).
+        // 7. Delivery (direct sales only — orders create their delivery from the order screen).
         if (inv.RequiresDelivery && s.Delivery.AutoCreateDelivery && inv.SalesOrderId is null && inv.CustomOrderId is null)
             result.DeliveryId = await DeliveryService.CreateForInvoiceAsync(conn, tx, session, invoiceId);
 
@@ -256,6 +272,7 @@ public sealed class InvoiceService(Db db, UserSession session, AuditService audi
             await conn.ExecuteAsync("update sales_orders set invoice_id = null, updated_at = now() where invoice_id = @invoiceId", new { invoiceId }, tx);
             await conn.ExecuteAsync("update custom_orders set invoice_id = null, updated_at = now() where invoice_id = @invoiceId", new { invoiceId }, tx);
             await conn.ExecuteAsync("update deliveries set status = 'CANCELLED', updated_at = now() where invoice_id = @invoiceId and status <> 'DELIVERED'", new { invoiceId }, tx);
+            await ServiceDeskService.VoidForInvoiceAsync(conn, tx, invoiceId, $"Invoice {inv.Number} cancelled");
 
             await audit.LogAsync(conn, tx, "CANCEL", "Sales", $"cancelled invoice {inv.Number} ({Money.Format(inv.GrandTotal)}) — {reason}",
                 "invoice", invoiceId, inv.Number, new { Status = "FINAL", inv.GrandTotal, pos.Paid }, new { Status = "CANCELLED", Reason = reason, AdvanceKept = pos.Paid });

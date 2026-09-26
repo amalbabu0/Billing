@@ -241,3 +241,34 @@ export interface ProductionOrder {
   otherCost?: number | null; materialCost?: number | null; totalCost?: number | null; notes?: string; startedAt?: string; completedAt?: string; cancelReason?: string;
   createdByName?: string; createdAt: string; materialLines: number; materialsShort: number; materials: ProductionMaterial[];
 }
+
+export interface WarrantyRecord {
+  id: number; number: string; customerId: number; customerName?: string; customerMobile?: string; invoiceId?: number; invoiceNumber?: string; invoiceItemId?: number;
+  customOrderId?: number; customOrderNumber?: string; variantId?: number; productName: string; serialNo?: string; startDate: string; endDate: string; terms?: string;
+  isVoid: boolean; voidReason?: string; createdAt: string; serviceTickets: number; daysLeft: number; state: 'ACTIVE' | 'EXPIRING' | 'EXPIRED' | 'VOID';
+}
+export interface ServiceTicket {
+  id: number; number: string; customerId: number; customerName?: string; customerMobile?: string; warrantyId?: number; warrantyNumber?: string; warrantyEnd?: string;
+  invoiceId?: number; invoiceNumber?: string; productName: string; serialNo?: string; issue: string; address?: string; status: string; priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+  underWarranty: boolean; technicianName?: string; technicianUserId?: number; visitDate?: string; partsUsed?: string; serviceCharge: number; resolution?: string;
+  serviceInvoiceId?: number; serviceInvoiceNumber?: string; completedAt?: string; cancelReason?: string; createdByName?: string; createdAt: string;
+}
+export interface Lead {
+  id: number; number: string; name: string; mobile?: string; email?: string; city?: string; source?: string; status: string; salespersonId?: number; salespersonName?: string;
+  interestedProducts?: string; expectedValue: number; nextFollowUp?: string; customerId?: number; customerName?: string; quotationId?: number; lostReason?: string; notes?: string;
+  createdAt: string; updatedAt: string; openFollowUps: number;
+}
+export interface FollowUp {
+  id: number; refType: string; refId: number; refLabel?: string; customerId?: number; customerName?: string; mobile?: string; title: string; dueDate: string; assignedTo?: number;
+  assignedName?: string; note?: string; doneAt?: string; outcome?: string; createdByName?: string; createdAt: string; isOverdue: boolean;
+}
+export interface CashSession {
+  id: number; businessDate: string; openingCash: number; openedByName?: string; openedAt: string; cashSales?: number; cashRefunds?: number; cashExpenses?: number; cashSupplier?: number;
+  expectedCash?: number; countedCash?: number; difference?: number; status: 'OPEN' | 'CLOSED' | 'APPROVED'; closedByName?: string; closedAt?: string; closeNote?: string;
+  approvedByName?: string; approvedAt?: string; approvalNote?: string; needsApproval: boolean;
+}
+export interface CashDay {
+  session?: CashSession | null; suggestedOpening?: number | null; expected?: number | null;
+  figures: { date: string; cashSales: number; cashRefunds: number; cashExpenses: number; cashSupplier: number; receipts: number; nonCash: number; net: number };
+  movements: { at: string; kind: string; number?: string; party?: string; amount: number; byName?: string }[];
+}

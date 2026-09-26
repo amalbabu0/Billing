@@ -105,6 +105,8 @@ public class ApiTests(WebFixture w) : IClassFixture<WebFixture>
                      "/api/audit?pageSize=10", "/api/settings", "/api/reports", "/api/search?q=sofa", "/api/notifications", "/api/brands", "/api/pos/recent",
                      "/api/warehouses", "/api/warehouses/stock", "/api/transfers?status=OPEN", "/api/raw-materials?low=true", "/api/raw-materials/categories",
                      "/api/raw-materials/movements", "/api/boms", "/api/production/board", "/api/production?status=OPEN",
+                     "/api/warranties?status=EXPIRING", "/api/service?status=OPEN", "/api/leads?status=OPEN", "/api/leads/pipeline", "/api/follow-ups?scope=today&mine=true",
+                     "/api/cash", "/api/cash/history",
                  })
         {
             var r = await c.GetAsync(url);

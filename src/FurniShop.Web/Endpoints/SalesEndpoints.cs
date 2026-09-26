@@ -10,8 +10,8 @@ namespace FurniShop.Web.Endpoints;
 
 public static partial class Api
 {
-    public sealed record CheckoutRequest(SalesDocumentInput Document, List<PaymentLineInput>? Payments, decimal UseAdvance);
-    public sealed record FinalizeRequest(List<PaymentLineInput>? Payments, decimal UseAdvance);
+    public sealed record CheckoutRequest(SalesDocumentInput Document, List<PaymentLineInput>? Payments, decimal UseAdvance, string? CreditOverride = null);
+    public sealed record FinalizeRequest(List<PaymentLineInput>? Payments, decimal UseAdvance, string? CreditOverride = null);
     public sealed record ReasonRequest(string Reason);
     public sealed record StatusRequest(string Status, string? Note);
     public sealed record ConvertQuotationRequest(DateTime? ExpectedDelivery, bool Confirm = true);
@@ -74,9 +74,9 @@ public static partial class Api
         });
         api.MapPost("/invoices/draft", async (SalesDocumentInput input, AppServices app) => new { id = await app.Invoices.SaveDraftAsync(input) });
         api.MapPost("/invoices/checkout", async (CheckoutRequest r, AppServices app) =>
-            await app.Invoices.CheckoutAsync(r.Document, r.Payments ?? new(), r.UseAdvance));
+            await app.Invoices.CheckoutAsync(r.Document, r.Payments ?? new(), r.UseAdvance, r.CreditOverride));
         api.MapPost("/invoices/{id:long}/finalize", async (long id, FinalizeRequest r, AppServices app) =>
-            await app.Invoices.FinalizeAsync(id, r.Payments ?? new(), r.UseAdvance));
+            await app.Invoices.FinalizeAsync(id, r.Payments ?? new(), r.UseAdvance, r.CreditOverride));
         api.MapPost("/invoices/{id:long}/cancel", async (long id, ReasonRequest r, AppServices app) => { await app.Invoices.CancelAsync(id, r.Reason); return Results.NoContent(); });
         api.MapDelete("/invoices/{id:long}", async (long id, AppServices app) => { await app.Invoices.DeleteDraftAsync(id); return Results.NoContent(); });
         api.MapGet("/invoices/{id:long}/pdf", async (long id, string? format, bool? download, AppServices app) =>

@@ -133,3 +133,116 @@ public class LocationAndProductionTests(DbFixture f) : IClassFixture<DbFixture>
         await Assert.ThrowsAsync<BusinessRuleException>(() => f.App.Production.IssueAsync(po2, new[] { new IssueInput { RawMaterialId = foam, Quantity = 1 } }));
     }
 }
+
+public class ServiceCrmCashTests(DbFixture f) : IClassFixture<DbFixture>
+{
+    private async Task<long> WarrantyProductAsync(string code, int months)
+    {
+        var v = await f.ProductAsync(code, 30000, 18000, 5);
+        var pid = await f.App.Db.ScalarAsync<long>("select product_id from product_variants where id = @v", new { v });
+        await f.App.Db.ExecuteAsync("update products set warranty_months = @months, warranty_terms = 'Manufacturing defects only' where id = @pid", new { months, pid });
+        return v;
+    }
+
+    [DbFact]
+    public async Task Warranty_is_registered_on_sale_voided_on_cancel_and_service_outside_warranty_is_billed()
+    {
+        var v = await WarrantyProductAsync("WAR-BED", 24);
+        var c = await f.CustomerAsync("Warranty Customer", "9876533333");
+        var sale = await f.App.Invoices.CheckoutAsync(new SalesDocumentInput { CustomerId = c, Lines = { await f.LineAsync(v) } }, new[] { DbFixture.Pay(PaymentMethodCode.Cash, 30000) });
+        var w = (await f.App.ServiceDesk.WarrantiesAsync(new ListQuery { CustomerId = c })).Items.Single();
+        Assert.Equal(DateTime.Today.AddMonths(24).AddDays(-1), w.EndDate);
+        Assert.Equal("ACTIVE", w.State);
+        Assert.Equal("Manufacturing defects only", w.Terms);
+        await f.App.ServiceDesk.UpdateWarrantyAsync(w.Id, "SN-7781", w.Terms);
+        Assert.Equal("SN-7781", await f.App.Db.ScalarAsync<string>("select serial_no from invoice_items where id = @id", new { id = w.InvoiceItemId }));
+
+        // Ticket against an active warranty: free repair, no invoice.
+        var t1 = await f.App.ServiceDesk.SaveTicketAsync(new ServiceTicketInput { CustomerId = c, WarrantyId = w.Id, ProductName = w.ProductName, Issue = "Hydraulic lift stuck" });
+        Assert.True((await f.App.ServiceDesk.TicketAsync(t1)).UnderWarranty);
+        await Assert.ThrowsAsync<BusinessRuleException>(() => f.App.ServiceDesk.CompleteAsync(t1, new ServiceCompleteInput { Resolution = "x" })); // no technician
+        await f.App.ServiceDesk.AssignAsync(t1, DateTime.Today.AddDays(1), "Suresh", null);
+        await f.App.ServiceDesk.MoveAsync(t1, ServiceStatus.Repair, null);
+        Assert.Null(await f.App.ServiceDesk.CompleteAsync(t1, new ServiceCompleteInput { Resolution = "Replaced gas lift" }));
+
+        // Out-of-warranty job with a charge → GST service invoice (SAC 998719), part-paid.
+        var t2 = await f.App.ServiceDesk.SaveTicketAsync(new ServiceTicketInput { CustomerId = c, ProductName = "Old sofa", Issue = "Re-upholstery" });
+        await f.App.ServiceDesk.AssignAsync(t2, DateTime.Today, "Imran", null);
+        var bill = await f.App.ServiceDesk.CompleteAsync(t2, new ServiceCompleteInput { Resolution = "New fabric", ServiceCharge = 5900, Payments = { DbFixture.Pay(PaymentMethodCode.Upi, 2000, "U1") } });
+        var inv = await f.App.Invoices.GetAsync(bill!.InvoiceId);
+        Assert.Equal((5900m, 5000m, 900m), (inv.GrandTotal, inv.TaxableTotal, inv.CgstTotal + inv.SgstTotal));
+        Assert.Equal(ServiceDeskService.ServiceHsn, inv.Lines.Single().HsnCode);
+        Assert.Equal(3900m, inv.Balance);
+        Assert.Equal(bill.InvoiceId, (await f.App.ServiceDesk.TicketAsync(t2)).ServiceInvoiceId);
+
+        // Cancelling the sale voids its warranty.
+        await f.App.Invoices.CancelAsync(sale.InvoiceId, "Wrong customer");
+        Assert.Equal("VOID", (await f.App.ServiceDesk.WarrantyAsync(w.Id)).State);
+    }
+
+    [DbFact]
+    public async Task Credit_limit_blocks_unless_an_authorised_user_gives_a_reason()
+    {
+        var v = await f.ProductAsync("CRD-1", 50000, 30000, 5);
+        var c = await f.App.Customers.SaveAsync(new Customer { Name = "Credit Customer", Mobile = "9876544444", StateCode = "29", CreditLimit = 20000 });
+        var doc = new SalesDocumentInput { CustomerId = c, Lines = { await f.LineAsync(v) } };
+        var ex = await Assert.ThrowsAsync<CreditLimitException>(() => f.App.Invoices.CheckoutAsync(doc, new[] { DbFixture.Pay(PaymentMethodCode.Cash, 10000) }));
+        Assert.True(ex.CanOverride); // admin holds credit.override
+        Assert.Equal(40000m, ex.Outstanding);
+        var ok = await f.App.Invoices.CheckoutAsync(doc, new[] { DbFixture.Pay(PaymentMethodCode.Cash, 10000) }, creditOverride: "Long-standing customer, cheque on Friday");
+        Assert.Equal("Long-standing customer, cheque on Friday", await f.App.Db.ScalarAsync<string>("select credit_override_reason from invoices where id = @id", new { id = ok.InvoiceId }));
+        // Within the limit no reason is needed.
+        await f.App.Invoices.CheckoutAsync(new SalesDocumentInput { CustomerId = c, Lines = { await f.LineAsync(v) } }, new[] { DbFixture.Pay(PaymentMethodCode.Cash, 50000) });
+    }
+
+    [DbFact]
+    public async Task Lead_moves_through_pipeline_and_converts_with_follow_ups()
+    {
+        var id = await f.App.Crm.SaveLeadAsync(new Lead { Name = "Priya Menon", Mobile = "98450 11122", Source = "Walk-in", InterestedProducts = "L-shape sofa, dining set", ExpectedValue = 120000, NextFollowUp = DateTime.Today });
+        await Assert.ThrowsAsync<ValidationException>(() => f.App.Crm.SaveLeadAsync(new Lead { Name = "Dup", Mobile = "9845011122" }));
+        var due = await f.App.Crm.FollowUpsAsync("today", mine: true);
+        var fu = due.Single(x => x.RefType == "LEAD" && x.RefId == id);
+        await f.App.Crm.CompleteFollowUpAsync(fu.Id, "Wants fabric samples", DateTime.Today.AddDays(3), "Share fabric catalogue");
+        Assert.Equal(DateTime.Today.AddDays(3), (await f.App.Crm.LeadAsync(id)).NextFollowUp);
+
+        await f.App.Crm.MoveLeadAsync(id, LeadStatus.Contacted, null);
+        var customer = await f.App.Crm.ConvertAsync(id, keepOpen: true);
+        var lead = await f.App.Crm.LeadAsync(id);
+        Assert.Equal((LeadStatus.Quotation, customer), (lead.Status, lead.CustomerId));
+        Assert.Equal("9845011122", (await f.App.Customers.GetAsync(customer)).Mobile);
+        Assert.Equal(customer, await f.App.Crm.ConvertAsync(id)); // same customer, now converted
+        Assert.Equal(LeadStatus.Converted, (await f.App.Crm.LeadAsync(id)).Status);
+        await Assert.ThrowsAsync<BusinessRuleException>(() => f.App.Crm.MoveLeadAsync(id, LeadStatus.Negotiation, null));
+
+        var lost = await f.App.Crm.SaveLeadAsync(new Lead { Name = "Window shopper" });
+        await Assert.ThrowsAsync<ValidationException>(() => f.App.Crm.MoveLeadAsync(lost, LeadStatus.Lost, null));
+        await f.App.Crm.MoveLeadAsync(lost, LeadStatus.Lost, null, "Budget too low");
+        Assert.Equal(LeadStatus.Lost, (await f.App.Crm.LeadAsync(lost)).Status);
+    }
+
+    [DbFact]
+    public async Task Cash_register_expects_opening_plus_cash_flows_and_differences_need_approval()
+    {
+        var day = DateTime.Today;
+        await f.App.Cash.OpenAsync(5000, day);
+        await Assert.ThrowsAsync<BusinessRuleException>(() => f.App.Cash.OpenAsync(5000, day));
+        var before = (await f.App.Cash.DayAsync(day)).Figures; // other tests in this class also take cash today
+        var v = await f.ProductAsync("CASH-1", 11800, 6000, 5);
+        var c = await f.CustomerAsync("Cash Customer", "9876555555");
+        await f.App.Invoices.CheckoutAsync(new SalesDocumentInput { CustomerId = c, Lines = { await f.LineAsync(v) } }, new[] { DbFixture.Pay(PaymentMethodCode.Cash, 8000), DbFixture.Pay(PaymentMethodCode.Upi, 3800, "U") });
+        var cat = await f.App.Db.ScalarAsync<long>("select id from expense_categories order by id limit 1");
+        await f.App.Expenses.SaveAsync(new Expense { CategoryId = cat, Amount = 500, MethodCode = PaymentMethodCode.Cash, ExpenseDate = day, Description = "Tea" });
+
+        var d = await f.App.Cash.DayAsync(day);
+        Assert.Equal((8000m, 500m, 3800m), (d.Figures.CashSales - before.CashSales, d.Figures.CashExpenses - before.CashExpenses, d.Figures.NonCash - before.NonCash));
+        var expected = 5000 + before.Net + 7500;
+        Assert.Equal(expected, d.Expected);
+
+        await Assert.ThrowsAsync<ValidationException>(() => f.App.Cash.CloseAsync(day, expected - 200, null)); // difference needs a note
+        var closed = await f.App.Cash.CloseAsync(day, expected - 200, "₹200 given as change, not recorded");
+        Assert.Equal(("CLOSED", -200m), (closed.Status, closed.Difference!.Value));
+        await f.App.Cash.ApproveAsync(day, "Accepted");
+        Assert.Equal("APPROVED", (await f.App.Cash.DayAsync(day)).Session!.Status);
+        Assert.Equal(expected - 200, (await f.App.Cash.DayAsync(day.AddDays(1))).SuggestedOpening);
+    }
+}

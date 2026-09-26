@@ -39,6 +39,8 @@ public static partial class MessageTemplates
             ["amount"] = "₹25,000.00", ["method"] = "UPI", ["date"] = DateTime.Today.ToString("dd-MMM-yyyy"),
             ["due_date"] = DateTime.Today.AddDays(15).ToString("dd-MMM-yyyy"), ["valid_until"] = DateTime.Today.AddDays(15).ToString("dd-MMM-yyyy"),
             ["slot"] = "10 AM - 1 PM", ["driver"] = "Ramesh", ["vehicle"] = "KA-01-AB-1234", ["otp"] = "4821",
+            ["product"] = "Sheesham dining set", ["status"] = "is assigned to Suresh for tomorrow", ["technician"] = "Suresh", ["receiver"] = "Mrs. Rao",
+            ["end_date"] = DateTime.Today.AddDays(20).ToString("dd-MMM-yyyy"),
         };
         return Render(template, sample);
     }

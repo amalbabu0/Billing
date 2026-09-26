@@ -31,3 +31,9 @@ export const PRODUCTION_LABELS: Record<string, string> = {
 };
 export const TRANSFER_LABELS: Record<string, string> = { DRAFT: 'Draft', DISPATCHED: 'Dispatched', IN_TRANSIT: 'In transit', RECEIVED: 'Received', CANCELLED: 'Cancelled' };
 export const PRIORITY_TONE: Record<string, Tone> = { LOW: 'muted', NORMAL: 'muted', HIGH: 'warn', URGENT: 'bad' };
+export const SERVICE_FLOW = ['NEW', 'ASSIGNED', 'VISIT', 'REPAIR', 'QC', 'COMPLETED'] as const;
+export const SERVICE_LABELS: Record<string, string> = { NEW: 'New', ASSIGNED: 'Technician assigned', VISIT: 'Technician visit', REPAIR: 'Repair', QC: 'Quality check', COMPLETED: 'Completed', CANCELLED: 'Cancelled' };
+export const LEAD_FLOW = ['NEW', 'CONTACTED', 'QUOTATION', 'NEGOTIATION', 'CONFIRMED'] as const;
+export const LEAD_LABELS: Record<string, string> = { NEW: 'New lead', CONTACTED: 'Contacted', QUOTATION: 'Quotation', NEGOTIATION: 'Negotiation', CONFIRMED: 'Confirmed', CONVERTED: 'Converted', LOST: 'Lost' };
+export const WARRANTY_LABELS: Record<string, string> = { ACTIVE: 'Active', EXPIRING: 'Expiring soon', EXPIRED: 'Expired', VOID: 'Void' };
+export const WARRANTY_TONE: Record<string, Tone> = { ACTIVE: 'ok', EXPIRING: 'warn', EXPIRED: 'muted', VOID: 'bad' };

@@ -100,6 +100,14 @@ public sealed class WhatsAppSettings
         "Hello {customer},\nYour furniture delivery {number} is scheduled on {date} {slot}.\nDriver: {driver} {vehicle}\nDelivery OTP: {otp}\n— {shop}";
     public string OrderConfirmationTemplate { get; set; } =
         "Hello {customer},\nYour order {number} for {total} is confirmed.\nAdvance received: {paid}\nBalance: {balance}\nExpected delivery: {date}\nThank you — {shop}";
+    public string ProductionReadyTemplate { get; set; } =
+        "Hello {customer},\nGood news — your {product} ({number}) is ready.\nBalance to pay: {balance}\nWe will call you to fix a delivery date. — {shop}, {shop_phone}";
+    public string DeliveryCompletedTemplate { get; set; } =
+        "Hello {customer},\nYour delivery {number} was completed on {date}. Received by {receiver}.\nThank you for shopping with {shop}!";
+    public string WarrantyReminderTemplate { get; set; } =
+        "Hello {customer},\nThe warranty {number} on your {product} ends on {end_date}.\nIf anything needs attention, call us at {shop_phone} before then. — {shop}";
+    public string ServiceUpdateTemplate { get; set; } =
+        "Hello {customer},\nYour service request {number} for {product} {status}.\nFor help call {shop_phone}. — {shop}";
 }
 
 /// <summary>Stored as JSON under key "security".</summary>

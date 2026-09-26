@@ -97,5 +97,64 @@ public sealed class DemoOperationsSeeder(AppServices app)
             if (await VariantAsync("SOF-CHS-GRN") is { } s2)
                 await app.Production.SaveOrderAsync(new ProductionInput { VariantId = s2, Quantity = 1, DueDate = today.AddDays(18), Priority = "LOW" });
         }
+
+        if (await app.Db.ScalarAsync<int>("select count(*) from leads") == 0)
+        {
+            progress?.Report("Leads and follow-ups…");
+            var staff = (await app.Db.QueryAsync<long>("select id from users where username in ('sales1','sales2','manager') order by username")).ToList();
+            long Sp(int i) => staff.Count == 0 ? app.Session.UserId!.Value : staff[i % staff.Count];
+            var leads = new (string Name, string Mobile, string Source, string Products, decimal Value, string Stage, int Follow)[]
+            {
+                ("Anitha Krishnan", "9880112233", "Walk-in", "L-shape sofa, centre table", 95000, LeadStatus.New, 0),
+                ("Rakesh Gowda", "9845123987", "Instagram", "King bed with hydraulic storage", 48000, LeadStatus.Contacted, 1),
+                ("Sneha & Arjun", "9900456712", "Referral", "Complete 2BHK — wardrobes, beds, dining", 420000, LeadStatus.Negotiation, -1),
+                ("Dr. Farhan Ali", "9731209876", "Google", "Clinic reception sofa + 6 chairs", 160000, LeadStatus.Quotation, 2),
+                ("Meenakshi Iyer", "9972334455", "Phone call", "Pooja mandir in teak", 42000, LeadStatus.New, 0),
+                ("Studio Aura (designer)", "9008876655", "Interior designer", "Office furniture for 3 cabins", 310000, LeadStatus.Confirmed, 1),
+            };
+            var i = 0;
+            foreach (var l in leads)
+            {
+                var id = await app.Crm.SaveLeadAsync(new Lead { Name = l.Name, Mobile = l.Mobile, Source = l.Source, InterestedProducts = l.Products, ExpectedValue = l.Value, SalespersonId = Sp(i), NextFollowUp = today.AddDays(l.Follow), City = "Bengaluru" });
+                foreach (var stage in LeadStatus.Flow.TakeWhile(x => x != l.Stage).Skip(1).Append(l.Stage).Where(x => x != LeadStatus.New))
+                    await app.Crm.MoveLeadAsync(id, stage, null);
+                i++;
+            }
+            var lost = await app.Crm.SaveLeadAsync(new Lead { Name = "Vivek Sharma", Mobile = "9611223344", Source = "Walk-in", InterestedProducts = "Recliner", ExpectedValue = 38000, SalespersonId = Sp(1) });
+            await app.Crm.MoveLeadAsync(lost, LeadStatus.Lost, null, "Bought online at a lower price");
+            var cust = await app.Db.ScalarAsync<long?>("select id from customers where not is_walk_in order by id limit 1");
+            if (cust is { } cid)
+                await app.Crm.AddFollowUpAsync(new FollowUpInput { RefType = "CUSTOMER", RefId = cid, Title = "Ask about sofa cushion replacement", DueDate = today, AssignedTo = Sp(0) });
+        }
+
+        if (await app.Db.ScalarAsync<int>("select count(*) from service_tickets") == 0)
+        {
+            progress?.Report("Service tickets…");
+            var w = (await app.ServiceDesk.WarrantiesAsync(new ListQuery { Status = "ACTIVE", PageSize = 5 })).Items;
+            if (w.Count > 0)
+            {
+                var t1 = await app.ServiceDesk.SaveTicketAsync(new ServiceTicketInput { CustomerId = w[0].CustomerId, WarrantyId = w[0].Id, ProductName = w[0].ProductName, Issue = "Drawer channel jammed, one handle loose", Priority = "HIGH" });
+                await app.ServiceDesk.AssignAsync(t1, today.AddDays(1), "Suresh (technician)", null);
+            }
+            if (w.Count > 1)
+            {
+                var t2 = await app.ServiceDesk.SaveTicketAsync(new ServiceTicketInput { CustomerId = w[1].CustomerId, WarrantyId = w[1].Id, ProductName = w[1].ProductName, Issue = "Squeaking noise from frame" });
+                await app.ServiceDesk.AssignAsync(t2, today, "Suresh (technician)", null);
+                await app.ServiceDesk.MoveAsync(t2, ServiceStatus.Repair, "Frame bolts replaced, polish touch-up pending");
+            }
+            var any = await app.Db.ScalarAsync<long?>("select id from customers where not is_walk_in order by id desc limit 1");
+            if (any is { } c2)
+                await app.ServiceDesk.SaveTicketAsync(new ServiceTicketInput { CustomerId = c2, ProductName = "Old teak dining chairs (not bought here)", Issue = "Re-polish and re-weave cane seats", Priority = "LOW" });
+        }
+
+        if (await app.Db.ScalarAsync<int>("select count(*) from cash_sessions") == 0)
+        {
+            progress?.Report("Cash register…");
+            var y = today.AddDays(-1);
+            await app.Cash.OpenAsync(5000, y);
+            var expected = (await app.Cash.DayAsync(y)).Expected ?? 5000;
+            await app.Cash.CloseAsync(y, expected, null);
+            await app.Cash.OpenAsync(5000, today); // the rest was banked
+        }
     }
 }

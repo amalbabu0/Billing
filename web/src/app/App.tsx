@@ -49,6 +49,11 @@ const RawMaterials = lazy(() => import('@/pages/production/RawMaterials'));
 const Boms = lazy(() => import('@/pages/production/Boms'));
 const BomEditor = lazy(() => import('@/pages/production/Boms').then(m => ({ default: m.BomEditor })));
 const Production = lazy(() => import('@/pages/production/Production'));
+const ServiceTickets = lazy(() => import('@/pages/service/Service').then(m => ({ default: m.ServiceTickets })));
+const Warranties = lazy(() => import('@/pages/service/Service').then(m => ({ default: m.Warranties })));
+const Leads = lazy(() => import('@/pages/crm/Crm').then(m => ({ default: m.Leads })));
+const FollowUps = lazy(() => import('@/pages/crm/Crm').then(m => ({ default: m.FollowUps })));
+const CashRegister = lazy(() => import('@/pages/CashRegister'));
 const CustomOrders = lazy(() => import('@/pages/custom/CustomOrders'));
 const CustomOrderEditor = lazy(() => import('@/pages/custom/CustomOrderEditor'));
 const CustomOrderDetail = lazy(() => import('@/pages/custom/CustomOrderDetail'));
@@ -132,6 +137,11 @@ function Gate() {
           <Route path="inventory/reserved" element={<Page perms={[P.InventoryView]}><Reserved /></Page>} />
           <Route path="inventory/locations" element={<Page perms={[P.InventoryView]}><Locations /></Page>} />
           <Route path="inventory/transfers" element={<Page perms={[P.InventoryView, P.WarehouseManage]}><Transfers /></Page>} />
+          <Route path="service/tickets" element={<Page perms={[P.ServiceView]}><ServiceTickets /></Page>} />
+          <Route path="service/warranties" element={<Page perms={[P.WarrantyView, P.ServiceView]}><Warranties /></Page>} />
+          <Route path="crm/leads" element={<Page perms={[P.LeadView]}><Leads /></Page>} />
+          <Route path="crm/follow-ups" element={<Page perms={[P.LeadView, P.CustomerView]}><FollowUps /></Page>} />
+          <Route path="cash" element={<Page perms={[P.CashManage, P.CashApprove]}><CashRegister /></Page>} />
           <Route path="production" element={<Page perms={[P.ProductionView]}><Production mode="board" /></Page>} />
           <Route path="production/orders" element={<Page perms={[P.ProductionView]}><Production mode="list" /></Page>} />
           <Route path="production/materials" element={<Page perms={[P.RawMaterialView, P.ProductionView]}><RawMaterials view="materials" /></Page>} />

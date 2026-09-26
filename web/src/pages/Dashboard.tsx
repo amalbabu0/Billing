@@ -12,6 +12,7 @@ import { useCan, useMe } from '@/app/providers';
 import { Card, Delta, DocNo, ErrorPanel, Kpi, Money, Status, Tabs } from '@/components/ui/display';
 import { DateRange } from '@/components/pickers';
 import { TrendChart } from '@/components/Charts';
+import { AttentionRow, FollowUpsCard } from '@/components/DashboardExtras';
 
 interface KpiValue { value: number; previous?: number | null; count: number; changePercent?: number | null }
 interface Overview {
@@ -80,6 +81,8 @@ export default function Dashboard() {
               foot={d && <span>{d.customOrdersInProgress} custom in production</span>} to={can(P.SalesOrderView) ? '/sales/orders?open=true' : undefined} />
           </section>
 
+          <AttentionRow />
+
           <div className="dash-grid">
             <Card title="Sales trend" sub={d ? `${date(d.trendFrom)} – ${date(d.to)}${d.trendFrom !== d.from ? ' (last 30 days for context)' : ''} · average invoice ${money(d.averageInvoice, { decimals: false })}` : ' '}>
               {d && d.trend.length > 1 ? (
@@ -105,7 +108,7 @@ export default function Dashboard() {
                   <Link key={i.id} to={`/sales/invoices/${i.id}`} className="mini-row">
                     <div className="main">
                       <div className="title">{i.customerName}</div>
-                      <div className="meta"><span className="doc-no">{i.number}</span> · {days !== null && days < 0 ? <span className="t-bad">{-days} days overdue</span> : `due ${shortDate(i.dueDate)}`}</div>
+                      <div className="meta"><span className="doc-no">{i.number}</span> · {days !== null && days < 0 ? <span className="t-bad">{-days} day{days === -1 ? '' : 's'} overdue</span> : `due ${shortDate(i.dueDate)}`}</div>
                     </div>
                     <Money value={i.balance} decimals={false} strong />
                   </Link>
@@ -115,6 +118,7 @@ export default function Dashboard() {
           </div>
 
           <div className="ops-grid">
+            <FollowUpsCard />
             {can(P.DeliveryView) && (
               <Card title="Deliveries" sub={`${d?.pendingDeliveries ?? 0} open`} bodyClass="" actions={<Link className="btn btn-sm btn-ghost" to="/delivery/all">Board<ArrowRight aria-hidden /></Link>}>
                 {(d?.upcomingDeliveries ?? []).length === 0 ? <div className="card-list-empty">No deliveries waiting.</div> : d!.upcomingDeliveries.map(x => (
@@ -138,7 +142,7 @@ export default function Dashboard() {
                       <span className="icon-circle tone-brand"><Hammer aria-hidden /></span>
                       <div className="main">
                         <div className="title">{o.productType} · {o.customerName}</div>
-                        <div className="meta">{days === null ? 'No date' : days < 0 ? <span className="t-bad">{-days} days late</span> : days === 0 ? 'Due today' : `Due in ${days} days`}</div>
+                        <div className="meta">{days === null ? 'No date' : days < 0 ? <span className="t-bad">{-days} day{days === -1 ? '' : 's'} late</span> : days === 0 ? 'Due today' : `Due in ${days} days`}</div>
                       </div>
                       <Status value={o.status} text={CUSTOM_ORDER_LABELS[o.status]} />
                     </Link>

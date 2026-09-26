@@ -225,6 +225,7 @@ public static class Errors
         {
             await WriteAsync(ctx, 400, ex.Errors.Count == 1 ? ex.Errors.Values.First() : "Please correct the highlighted fields.", ex.Errors, "validation");
         }
+        catch (CreditLimitException ex) { await WriteAsync(ctx, 409, ex.Message, code: ex.CanOverride ? "credit_limit_overridable" : "credit_limit"); }
         catch (BusinessRuleException ex) { await WriteAsync(ctx, 409, ex.Message, code: "rule"); }
         catch (ConcurrencyException ex) { await WriteAsync(ctx, 409, ex.Message, code: "concurrency"); }
         catch (NotFoundException ex) { await WriteAsync(ctx, 404, ex.Message, code: "not_found"); }
