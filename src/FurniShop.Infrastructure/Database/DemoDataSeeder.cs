@@ -49,6 +49,7 @@ public sealed class DemoDataSeeder(AppServices app)
         await DeliveriesAsync(today);
         await ReturnsAsync(today);
         await ExpensesAsync(today);
+        await new DemoOperationsSeeder(app).SeedAsync(progress);
         await app.Audit.LogAsync("SEED", "System", "loaded demo data");
         progress?.Report("Done");
     }

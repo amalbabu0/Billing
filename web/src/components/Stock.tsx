@@ -5,11 +5,12 @@ import { ArrowDownLeft, ArrowUpRight, Boxes, SlidersHorizontal } from 'lucide-re
 import { api, errorMessage } from '@/lib/api';
 import { date, dateTime, label, money, qty } from '@/lib/format';
 import { P } from '@/lib/perms';
-import type { InventoryRow, Movement } from '@/lib/types';
+import type { InventoryRow, LocationStockRow, Movement } from '@/lib/types';
 import { useCan, useToast } from '@/app/providers';
 import { DocNo, EmptyState, Money, Notice, Status, Tabs, Timeline } from './ui/display';
 import { Drawer, Modal } from './ui/overlay';
 import { NumberInput, TextInput } from './ui/form';
+import { useWarehouses, WarehouseSelect } from './Locations';
 
 interface HistoryRow { date: string; docType: string; docId: number; docNumber?: string; party?: string; quantity: number; rate?: number | null; note?: string }
 interface ReservedRow { salesOrderId: number; salesOrderNumber: string; customerName: string; status: string; orderDate: string; expectedDeliveryDate?: string; reservedQty: number }
@@ -40,6 +41,7 @@ export function StockDrawer({ variantId, onClose }: { variantId: number | null; 
             <Level label="Damaged" value={it.damaged} hint="not sellable" />
             <Level label="On hand" value={it.onHand} hint={d.stockValue !== null && d.stockValue !== undefined ? `value ${money(d.stockValue, { decimals: false })}` : 'physical, incl. reserved'} />
           </div>
+          <ByLocation variantId={it.variantId} />
           <Tabs value={tab} onChange={setTab} label="Stock history" tabs={[
             { value: 'timeline', label: 'Movements', count: d.timeline.length }, { value: 'purchases', label: 'Purchases', count: d.purchases.length },
             { value: 'sales', label: 'Sales', count: d.sales.length }, { value: 'returns', label: 'Returns', count: d.returns.length },
@@ -72,6 +74,17 @@ export function StockDrawer({ variantId, onClose }: { variantId: number | null; 
       )}
       {it && <AdjustStockModal open={adjust} onClose={() => setAdjust(false)} item={it} />}
     </Drawer>
+  );
+}
+
+function ByLocation({ variantId }: { variantId: number }) {
+  const { data: warehouses = [] } = useWarehouses();
+  const { data = [] } = useQuery({ queryKey: ['location-stock', 'variant', variantId], queryFn: () => api.get<LocationStockRow[]>('/api/warehouses/stock', { variantId }), enabled: warehouses.length > 1 });
+  if (warehouses.length <= 1) return null;
+  return (
+    <div className="row wrap gap-2" aria-label="Stock by location">
+      {data.map(r => <span key={r.warehouseId} className="chip" style={{ cursor: 'default' }}>{r.warehouseName} <b>{qty(r.onHand)}</b>{r.damaged ? <span className="t-bad"> · {qty(r.damaged)} dmg</span> : null}{r.inTransit ? <span className="t-warn"> · {qty(r.inTransit)} arriving</span> : null}</span>)}
+    </div>
   );
 }
 
@@ -116,6 +129,7 @@ export function AdjustStockModal({ open, onClose, item }: { open: boolean; onClo
   const [amount, setAmount] = useState<number | null>(1);
   const [reason, setReason] = useState('');
   const [unitCost, setUnitCost] = useState<number | null>(null);
+  const [warehouseId, setWarehouseId] = useState<number | null>(null);
   const [error, setError] = useState<string>();
   useEffect(() => { if (open) { setType('INCREASE'); setAmount(1); setReason(''); setError(undefined); } }, [open]);
   const after = (() => {
@@ -130,7 +144,7 @@ export function AdjustStockModal({ open, onClose, item }: { open: boolean; onClo
     }
   })();
   const save = useMutation({
-    mutationFn: () => api.post<{ number: string }>('/api/inventory/adjust', { variantId: item.variantId, adjustmentType: type, quantity: amount, reason, unitCost }),
+    mutationFn: () => api.post<{ number: string }>('/api/inventory/adjust', { variantId: item.variantId, adjustmentType: type, quantity: amount, reason, unitCost, warehouseId }),
     onSuccess: r => { toast.success('Stock updated successfully', `${r.number} · ${item.displayName}`); ['inventory', 'stock-detail', 'products', 'dashboard', 'movements'].forEach(k => qc.invalidateQueries({ queryKey: [k] })); onClose(); },
     onError: e => setError(errorMessage(e)),
   });
@@ -153,6 +167,7 @@ export function AdjustStockModal({ open, onClose, item }: { open: boolean; onClo
           <NumberInput label="Quantity" value={amount} min={0} onChange={setAmount} autoFocus />
           {type === 'INCREASE' && <NumberInput label="Unit cost" optional money value={unitCost} onChange={setUnitCost} hint="For stock valuation" />}
         </div>
+        {type !== 'SET_DISPLAY' && <WarehouseSelect label="At location" value={warehouseId} onChange={setWarehouseId} hint={type === 'INCREASE' ? 'Where the stock is added' : 'Taken from here first'} />}
         <TextInput label="Reason" required value={reason} onChange={e => setReason(e.target.value)} placeholder="e.g. Physical count on 25 Sep" hint="Kept in the activity log." />
         {type !== 'SET_DISPLAY' && (
           <Notice tone={after.available < 0 || after.damaged < 0 ? 'bad' : 'info'} icon={<Boxes aria-hidden />}>

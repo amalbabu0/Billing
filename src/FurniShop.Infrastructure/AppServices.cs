@@ -47,10 +47,14 @@ public sealed class AppServices : IAsyncDisposable
         Gst = new GstService(Db, Session);
         PurchaseReturns = new PurchaseReturnService(Db, Session, Audit, Inventory);
         Workspace = new WorkspaceService(Db, Session, Catalog);
+        Locations = new LocationService(Db, Session, Audit, Inventory);
+        Production = new ProductionService(Db, Session, Audit, Inventory);
         Documents = new DocumentService(this);
         Migrator = new Migrator(Db);
     }
 
+    public LocationService Locations { get; }
+    public ProductionService Production { get; }
     public Db Db { get; }
     public UserSession Session { get; }
     public AuditService Audit { get; }

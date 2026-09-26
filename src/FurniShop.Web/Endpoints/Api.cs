@@ -44,6 +44,7 @@ public static partial class Api
         MapGst(api);
         MapReports(api);
         MapAdmin(api);
+        MapProduction(api);
     }
 
     // ------------------------------------------------------------------ helpers

@@ -18,4 +18,7 @@ export const P = {
   ReportSales: 'report.sales', ReportInventory: 'report.inventory', ReportPurchase: 'report.purchase', ReportPayment: 'report.payment',
   ReportGst: 'report.gst', ReportProfit: 'report.profit', ExportData: 'export.data',
   UserManage: 'user.manage', RoleManage: 'role.manage', AuditView: 'audit.view', SettingsManage: 'settings.manage', BackupManage: 'backup.manage',
+  WarehouseManage: 'warehouse.manage', RawMaterialView: 'rawmaterial.view', RawMaterialManage: 'rawmaterial.manage', ProductionView: 'production.view',
+  ProductionManage: 'production.manage', WarrantyView: 'warranty.view', ServiceView: 'service.view', ServiceManage: 'service.manage', LeadView: 'lead.view',
+  LeadManage: 'lead.manage', CashManage: 'cash.manage', CashApprove: 'cash.approve', CreditOverride: 'credit.override', ProductImport: 'product.import',
 } as const;

@@ -103,6 +103,8 @@ public class ApiTests(WebFixture w) : IClassFixture<WebFixture>
                      "/api/purchase-returns", "/api/suppliers", "/api/supplier-payments", "/api/gst/dashboard", "/api/gst/sales?type=B2B",
                      $"/api/gst/hsn?from={DateTime.Today.AddDays(-90):yyyy-MM-dd}&to={DateTime.Today:yyyy-MM-dd}", "/api/users", "/api/roles",
                      "/api/audit?pageSize=10", "/api/settings", "/api/reports", "/api/search?q=sofa", "/api/notifications", "/api/brands", "/api/pos/recent",
+                     "/api/warehouses", "/api/warehouses/stock", "/api/transfers?status=OPEN", "/api/raw-materials?low=true", "/api/raw-materials/categories",
+                     "/api/raw-materials/movements", "/api/boms", "/api/production/board", "/api/production?status=OPEN",
                  })
         {
             var r = await c.GetAsync(url);
@@ -122,6 +124,10 @@ public class ApiTests(WebFixture w) : IClassFixture<WebFixture>
 
         foreach (var url in new[] { "/api/settings", "/api/gst/dashboard", "/api/users", "/api/audit", "/api/purchases" })
             Assert.Equal(HttpStatusCode.Forbidden, (await c.GetAsync(url)).StatusCode);
+        // Production is visible to sales staff, but never its costs.
+        var board = await c.JsonAsync(await c.GetAsync("/api/production/board"));
+        Assert.All(board.EnumerateArray(), o => Assert.Equal(JsonValueKind.Null, o.GetProperty("labourCost").ValueKind));
+        Assert.Equal(HttpStatusCode.Forbidden, (await c.PostAsync("/api/raw-materials", new { name = "x", category = "x", unit = "x" })).StatusCode);
 
         var products = await c.JsonAsync(await c.GetAsync("/api/products?pageSize=50"));
         Assert.All(products.GetProperty("items").EnumerateArray(), p => Assert.Equal(JsonValueKind.Null, p.GetProperty("costPrice").ValueKind));

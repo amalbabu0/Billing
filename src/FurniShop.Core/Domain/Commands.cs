@@ -124,6 +124,8 @@ public sealed class PurchaseInput
     public decimal PaidNow { get; set; }
     public string PaidMethod { get; set; } = PaymentMethodCode.Bank;
     public string? PaidReference { get; set; }
+    /// <summary>Location the goods are received into; null = default location.</summary>
+    public long? WarehouseId { get; set; }
 }
 
 public sealed class PurchaseLineInput
@@ -156,6 +158,7 @@ public sealed class StockAdjustmentInput
     public decimal Quantity { get; set; }
     public string Reason { get; set; } = "";
     public decimal? UnitCost { get; set; }
+    public long? WarehouseId { get; set; }
 }
 
 public sealed class DeliveryCompletion

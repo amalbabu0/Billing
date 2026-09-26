@@ -1,5 +1,5 @@
 import {
-  BarChart3, Boxes, ClipboardList, Hammer, IndianRupee, LayoutDashboard, Package, Receipt, Settings, ShoppingBag, Truck, UserCog, Users, Wallet, Wrench,
+  BarChart3, Boxes, ClipboardList, Factory, Hammer, IndianRupee, LayoutDashboard, Package, Receipt, Settings, ShoppingBag, Truck, UserCog, Users, Wallet, Wrench,
   type LucideIcon,
 } from 'lucide-react';
 import { P } from '@/lib/perms';
@@ -46,6 +46,8 @@ export const NAV: NavGroup[] = [
       { label: 'Reserved stock', to: '/inventory/reserved', perms: [P.InventoryView] },
       { label: 'Damaged stock', to: '/inventory/damaged', perms: [P.InventoryView] },
       { label: 'Low stock', to: '/inventory/low', perms: [P.InventoryView, P.ProductView] },
+      { label: 'Locations', to: '/inventory/locations', perms: [P.InventoryView] },
+      { label: 'Stock transfers', to: '/inventory/transfers', perms: [P.InventoryView, P.WarehouseManage] },
     ],
   },
   {
@@ -63,6 +65,15 @@ export const NAV: NavGroup[] = [
       { label: 'Production', to: '/custom-orders', perms: [P.CustomOrderView], end: true },
       { label: 'Ready for delivery', to: '/custom-orders/ready', perms: [P.CustomOrderView] },
       { label: 'Completed orders', to: '/custom-orders/completed', perms: [P.CustomOrderView] },
+    ],
+  },
+  {
+    label: 'Production', icon: Factory, children: [
+      { label: 'Production board', to: '/production', perms: [P.ProductionView], end: true },
+      { label: 'Production orders', to: '/production/orders', perms: [P.ProductionView] },
+      { label: 'Raw materials', to: '/production/materials', perms: [P.RawMaterialView, P.ProductionView], end: true },
+      { label: 'Material movements', to: '/production/materials/movements', perms: [P.RawMaterialView, P.ProductionView] },
+      { label: 'Bills of material', to: '/production/boms', perms: [P.RawMaterialView, P.ProductionView] },
     ],
   },
   {

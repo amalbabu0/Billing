@@ -659,6 +659,8 @@ public sealed class Purchase
     public DateTime? CompletedAt { get; set; }
     public string? CreatedByName { get; set; }
     public string? CancelReason { get; set; }
+    public long? WarehouseId { get; set; }
+    public string? WarehouseName { get; set; }
     public List<PurchaseLine> Lines { get; set; } = new();
     public string PaymentState => Status != PurchaseStatus.Completed ? Status : Domain.PaymentState.Of(NetTotal, Paid, DueDate, DateTime.Today);
 }

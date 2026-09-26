@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Ban, FileText, IndianRupee, MessageCircle, Pencil, Receipt, Truck } from 'lucide-react';
+import { ArrowRight, Ban, Factory, FileText, IndianRupee, MessageCircle, Pencil, Receipt, Truck } from 'lucide-react';
 import { api, errorMessage } from '@/lib/api';
 import { date, dateTime, daysFromToday, money } from '@/lib/format';
 import { P } from '@/lib/perms';
-import { CUSTOM_ORDER_FLOW, CUSTOM_ORDER_LABELS } from '@/lib/status';
-import type { CheckoutResult, CustomOrder, Delivery, Payment, StatusHistory } from '@/lib/types';
+import { CUSTOM_ORDER_FLOW, CUSTOM_ORDER_LABELS, PRODUCTION_LABELS } from '@/lib/status';
+import type { CheckoutResult, CustomOrder, Delivery, Payment, ProductionOrder, StatusHistory } from '@/lib/types';
 import { useCan, useLookups, useMe, useToast } from '@/app/providers';
 import { Card, DocNo, ErrorPanel, Money, Notice, PageHeader, SkeletonRows, Status, Timeline, Tracker } from '@/components/ui/display';
 import { Menu, Modal, useConfirm } from '@/components/ui/overlay';
@@ -104,6 +104,7 @@ export default function CustomOrderDetail() {
               </div>
             </div>
           </Card>
+          <ProductionCard order={o} />
           <Card title="Progress">
             <Timeline items={[...data.history].reverse().map(h => ({ key: h.id, title: CUSTOM_ORDER_LABELS[h.toStatus] ?? h.toStatus, detail: h.note && h.note !== CUSTOM_ORDER_LABELS[h.toStatus] ? h.note : undefined, time: `${dateTime(h.changedAt)}${h.changedByName ? ` · ${h.changedByName}` : ''}`, tone: h.toStatus === 'CANCELLED' ? 'bad' as const : 'ok' as const }))} />
           </Card>
@@ -164,5 +165,26 @@ function InvoiceModal({ open, onClose, order, onDone }: { open: boolean; onClose
         </div>
       </div>
     </Modal>
+  );
+}
+
+function ProductionCard({ order }: { order: CustomOrder }) {
+  const can = useCan();
+  const me = useMe();
+  const { data = [] } = useQuery({ queryKey: ['custom-order', order.id, 'production'], queryFn: () => api.get<ProductionOrder[]>(`/api/custom-orders/${order.id}/production`), enabled: can(P.ProductionView) });
+  if (!can(P.ProductionView)) return null;
+  const open = !['CANCELLED', 'COMPLETED'].includes(order.status) && !order.invoiceId;
+  return (
+    <Card title="Workshop" sub={data.length ? undefined : 'Raise a production order to plan materials and track the build.'}
+      actions={open && can(P.ProductionManage) && <Link className="btn btn-sm" to={`/production?customOrder=${order.id}`}><Factory aria-hidden />Start production</Link>}>
+      {data.length === 0 ? <p className="text-sm muted">No production orders yet.</p> : (
+        <ul className="list-plain stack gap-2">{data.map(p => (
+          <li key={p.id} className="row between gap-3">
+            <span><DocNo to={`/production?open=${p.id}`}>{p.number}</DocNo> <span className="text-sm soft">{p.description}</span></span>
+            <span className="row gap-3">{me.canSeeCost && p.totalCost != null && <span className="text-sm muted">{money(p.totalCost)}</span>}<Status value={p.status} text={PRODUCTION_LABELS[p.status]} /></span>
+          </li>
+        ))}</ul>
+      )}
+    </Card>
   );
 }

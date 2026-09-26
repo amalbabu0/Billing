@@ -9,6 +9,7 @@ import type { Purchase, Sellable, Supplier } from '@/lib/types';
 import { useCan, useLookups, useMe, useToast } from '@/app/providers';
 import { Card, EmptyState, Notice, PageHeader } from '@/components/ui/display';
 import { NumberInput, Switch, TextArea, TextInput } from '@/components/ui/form';
+import { WarehouseSelect } from '@/components/Locations';
 import { ProductPicker, SupplierPicker } from '@/components/pickers';
 
 interface Line { key: string; variantId: number; description: string; sku: string; hsnCode?: string; quantity: number; unitCost: number; discountPercent: number; gstRate: number }
@@ -36,13 +37,14 @@ export default function PurchaseEditor() {
   const [paidNow, setPaidNow] = useState<number | null>(0);
   const [method, setMethod] = useState('BANK');
   const [reference, setReference] = useState('');
+  const [warehouseId, setWarehouseId] = useState<number | null>(null);
 
   const existing = useQuery({ queryKey: ['purchase', Number(id)], queryFn: () => api.get<{ purchase: Purchase }>(`/api/purchases/${id}`), enabled: editing });
   useEffect(() => {
     const p = existing.data?.purchase;
     if (!p) return;
     api.get<Supplier>(`/api/suppliers/${p.supplierId}`).then(setSupplier).catch(() => {});
-    setBillNo(p.supplierInvoiceNo ?? ''); setDate(p.purchaseDate.slice(0, 10)); setDue(p.dueDate?.slice(0, 10) ?? ''); setOther(p.otherCharges); setNotes(p.notes ?? '');
+    setBillNo(p.supplierInvoiceNo ?? ''); setDate(p.purchaseDate.slice(0, 10)); setDue(p.dueDate?.slice(0, 10) ?? ''); setOther(p.otherCharges); setNotes(p.notes ?? ''); setWarehouseId(p.warehouseId ?? null);
     setLines(p.lines.map(l => ({ key: String(l.id), variantId: l.variantId, description: l.description, sku: l.sku ?? '', hsnCode: l.hsnCode, quantity: l.quantity, unitCost: l.unitCost, discountPercent: l.discountPercent, gstRate: l.gstRate })));
   }, [existing.data]);
 
@@ -67,7 +69,7 @@ export default function PurchaseEditor() {
       if (!lines.length) throw new Error('Add at least one item.');
       const body = {
         supplierId: supplier.id, supplierInvoiceNo: billNo || undefined, date, dueDate: due || undefined, otherCharges: other, notes: notes || undefined,
-        lines: lines.map(({ key: _k, sku: _s, ...l }) => l), complete, paidNow: complete ? paidNow ?? 0 : 0, paidMethod: method, paidReference: reference || undefined,
+        lines: lines.map(({ key: _k, sku: _s, ...l }) => l), complete, paidNow: complete ? paidNow ?? 0 : 0, paidMethod: method, paidReference: reference || undefined, warehouseId,
       };
       return editing ? api.put<{ id: number }>(`/api/purchases/${id}`, body) : api.post<{ id: number }>('/api/purchases', body);
     },
@@ -93,6 +95,7 @@ export default function PurchaseEditor() {
                 <TextInput label="Bill date" type="date" value={date} max={iso()} onChange={e => setDate(e.target.value)} />
                 <TextInput label="Payment due" optional type="date" value={due} onChange={e => setDue(e.target.value)} />
               </div>
+              <div style={{ maxWidth: 320 }}><WarehouseSelect label="Receive into" value={warehouseId} onChange={setWarehouseId} /></div>
               {supplier && <p className="text-xs muted">{inter ? 'Inter-state supplier → IGST' : 'Same state → CGST + SGST'}{supplier.gstin ? ` · GSTIN ${supplier.gstin}` : ' · supplier not GST registered'}</p>}
             </div>
           </Card>

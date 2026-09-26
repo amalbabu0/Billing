@@ -64,7 +64,7 @@ public sealed class PurchaseService(Db db, UserSession session, AuditService aud
                 input.Id, input.SupplierId, SupplierInvoiceNo = Core.Validation.Validators.Clean(input.SupplierInvoiceNo), Date = input.Date.Date,
                 input.DueDate, IsInterState = interState, Subtotal = subtotal, DiscountTotal = discount, TaxableTotal = taxable,
                 CgstTotal = cgst, SgstTotal = sgst, IgstTotal = igst, OtherCharges = Money.R2(input.OtherCharges), RoundOff = grand - exact,
-                GrandTotal = grand, input.Notes, Uid = session.UserId,
+                GrandTotal = grand, input.Notes, Uid = session.UserId, input.WarehouseId,
             };
             if (args.SupplierInvoiceNo is not null)
             {
@@ -80,9 +80,9 @@ public sealed class PurchaseService(Db db, UserSession session, AuditService aud
                 number = await SequenceService.NextAsync(conn, tx, DocType.Purchase, input.Date);
                 id = await conn.ExecuteScalarAsync<long>("""
                     insert into purchases (number, supplier_id, supplier_invoice_no, purchase_date, due_date, status, is_inter_state, subtotal, discount_total,
-                        taxable_total, cgst_total, sgst_total, igst_total, other_charges, round_off, grand_total, notes, created_by)
+                        taxable_total, cgst_total, sgst_total, igst_total, other_charges, round_off, grand_total, notes, created_by, warehouse_id)
                     values (@Number, @SupplierId, @SupplierInvoiceNo, @Date, @DueDate, 'DRAFT', @IsInterState, @Subtotal, @DiscountTotal,
-                        @TaxableTotal, @CgstTotal, @SgstTotal, @IgstTotal, @OtherCharges, @RoundOff, @GrandTotal, @Notes, @Uid) returning id
+                        @TaxableTotal, @CgstTotal, @SgstTotal, @IgstTotal, @OtherCharges, @RoundOff, @GrandTotal, @Notes, @Uid, @WarehouseId) returning id
                     """, new DynamicParameters(args).With("Number", number), tx);
             }
             else
@@ -94,7 +94,7 @@ public sealed class PurchaseService(Db db, UserSession session, AuditService aud
                 await conn.ExecuteAsync("""
                     update purchases set supplier_id=@SupplierId, supplier_invoice_no=@SupplierInvoiceNo, purchase_date=@Date, due_date=@DueDate,
                         is_inter_state=@IsInterState, subtotal=@Subtotal, discount_total=@DiscountTotal, taxable_total=@TaxableTotal, cgst_total=@CgstTotal,
-                        sgst_total=@SgstTotal, igst_total=@IgstTotal, other_charges=@OtherCharges, round_off=@RoundOff, grand_total=@GrandTotal, notes=@Notes
+                        sgst_total=@SgstTotal, igst_total=@IgstTotal, other_charges=@OtherCharges, round_off=@RoundOff, grand_total=@GrandTotal, notes=@Notes, warehouse_id=@WarehouseId
                     where id=@Id
                     """, args, tx);
                 await conn.ExecuteAsync("delete from purchase_items where purchase_id = @Id", input, tx);
@@ -146,7 +146,7 @@ public sealed class PurchaseService(Db db, UserSession session, AuditService aud
         {
             // Effective cost per unit = taxable value after discount ÷ quantity (GST is input credit, not cost).
             var unitCost = Money.R2(l.TaxableAmount / l.Quantity);
-            await inventory.ApplyAsync(conn, tx, l.VariantId, MovementType.PurchaseIn, l.Quantity, 0, 0, DocType.Purchase, id, p.Number, null, unitCost);
+            await inventory.ApplyAsync(conn, tx, l.VariantId, MovementType.PurchaseIn, l.Quantity, 0, 0, DocType.Purchase, id, p.Number, null, unitCost, p.WarehouseId);
             if (updateCost)
                 await conn.ExecuteAsync("update product_variants set cost_price = @unitCost, updated_at = now() where id = @VariantId", new { unitCost, l.VariantId }, tx);
         }
@@ -174,7 +174,7 @@ public sealed class PurchaseService(Db db, UserSession session, AuditService aud
                 if (paid > 0) throw new BusinessRuleException("Payments have been made against this purchase. Void them first.");
                 var lines = await conn.QueryAsync<PurchaseLine>("select * from purchase_items where purchase_id = @id", new { id }, tx);
                 foreach (var l in lines)
-                    await inventory.ApplyAsync(conn, tx, l.VariantId, MovementType.PurchaseCancelOut, -l.Quantity, 0, 0, DocType.Purchase, id, p.Number, $"Purchase cancelled: {reason}");
+                    await inventory.ApplyAsync(conn, tx, l.VariantId, MovementType.PurchaseCancelOut, -l.Quantity, 0, 0, DocType.Purchase, id, p.Number, $"Purchase cancelled: {reason}", null, p.WarehouseId);
             }
             await conn.ExecuteAsync("update purchases set status = 'CANCELLED', cancelled_at = now(), cancel_reason = @reason where id = @id", new { reason, id }, tx);
             await audit.LogAsync(conn, tx, "CANCEL", "Purchases", $"cancelled purchase {p.Number} — {reason}", "purchase", id, p.Number);
@@ -239,7 +239,7 @@ public sealed class PurchaseService(Db db, UserSession session, AuditService aud
 
     // ------------------------------------------------------------------ queries
     private const string Select = """
-        select p.*, s.name as supplier_name, u.full_name as created_by_name,
+        select p.*, s.name as supplier_name, u.full_name as created_by_name, (select name from warehouses w where w.id = p.warehouse_id) as warehouse_name,
                coalesce((select sum(a.amount) from supplier_payment_allocations a join supplier_payments sp on sp.id = a.supplier_payment_id and not sp.is_voided
                          where a.purchase_id = p.id), 0) as paid
         from purchases p join suppliers s on s.id = p.supplier_id left join users u on u.id = p.created_by

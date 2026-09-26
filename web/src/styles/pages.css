@@ -184,3 +184,19 @@ a.mini-row:hover { background: var(--surface-hover); text-decoration: none; }
 .report-tabs button:focus-visible { outline: none; box-shadow: var(--ring); }
 @media (max-width: 760px) { .report-tabs { flex-wrap: nowrap; overflow-x: auto; } .report-tabs button { white-space: nowrap; } }
 table.data.sticky-head thead th { position: sticky; top: 0; z-index: 1; }
+
+/* locations */
+.loc-card { position: relative; text-align: left; font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: var(--s-4); display: flex; flex-direction: column; gap: 4px; cursor: pointer; transition: border-color var(--fast), box-shadow var(--fast); }
+.loc-card:hover { border-color: var(--line-2); box-shadow: var(--shadow-sm); }
+.loc-card:focus-visible { outline: none; box-shadow: var(--ring); }
+.loc-card.selected { border-color: var(--walnut); box-shadow: 0 0 0 1px var(--walnut); }
+.loc-card.inactive { opacity: .6; }
+.loc-card svg { width: 16px; height: 16px; }
+.loc-num { font-size: var(--text-lg); font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
+.loc-edit { position: absolute; right: 10px; bottom: 10px; width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--radius-sm); color: var(--ink-3); }
+.loc-edit:hover { background: var(--surface-sunken); color: var(--ink); }
+.board.board-wide { grid-template-columns: repeat(8, minmax(230px, 1fr)); }
+@media (max-width: 1100px) { .board.board-wide { grid-template-columns: repeat(8, minmax(240px, 80vw)); } }
+.board-col.drop-over { border-color: var(--walnut); background: var(--walnut-soft); }
+.dcard[draggable='true'] { cursor: grab; }
+.dcard[draggable='true']:active { cursor: grabbing; }

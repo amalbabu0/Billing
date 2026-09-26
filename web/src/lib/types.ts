@@ -157,6 +157,7 @@ export interface Purchase {
   createdByName?: string; cancelReason?: string; paymentState: string;
   lines: { id: number; lineNo: number; variantId: number; description: string; sku?: string; hsnCode?: string; quantity: number; unitCost: number; discountPercent: number;
     discountAmount: number; taxableAmount: number; gstRate: number; cgst: number; sgst: number; igst: number; lineTotal: number; returnedQty: number; returnableQty: number }[];
+  warehouseId?: number; warehouseName?: string;
 }
 export interface SupplierPayment {
   id: number; number: string; supplierId: number; supplierName?: string; paymentDate: string; amount: number; methodCode: string; reference?: string; notes?: string;
@@ -213,3 +214,30 @@ export interface SalesDocInput {
   notes?: string; terms?: string; validUntil?: string; expectedDeliveryDate?: string; dueDate?: string; requiresDelivery?: boolean; requiresInstallation?: boolean;
 }
 export interface PaymentLineInput { methodCode: string; amount: number; reference?: string }
+
+// ---------------------------------------------------------------- operations extension
+export interface Warehouse { id: number; code: string; name: string; kind: 'SHOWROOM' | 'WAREHOUSE' | 'FACTORY'; address?: string; isDefault: boolean; isActive: boolean; units: number; stockValue?: number | null; products: number }
+export interface LocationStockRow { warehouseId: number; warehouseName: string; variantId: number; sku: string; productName: string; variantName?: string; onHand: number; damaged: number; inTransit: number }
+export interface TransferLine { id: number; variantId: number; sku?: string; description?: string; quantity: number; fromStock?: number | null }
+export interface StockTransfer {
+  id: number; number: string; fromWarehouseId: number; fromName?: string; toWarehouseId: number; toName?: string; status: string; transferDate: string; vehicleNo?: string;
+  notes?: string; dispatchedAt?: string; receivedAt?: string; cancelReason?: string; createdByName?: string; createdAt: string; totalQty: number; lineCount: number; lines: TransferLine[];
+}
+export interface RawMaterial {
+  id: number; code: string; name: string; category: string; unit: string; costPrice?: number | null; stock: number; minStock: number; reorderQty: number; supplierId?: number;
+  supplierName?: string; warehouseId?: number; warehouseName?: string; notes?: string; isActive: boolean; stockValue?: number | null; isLow: boolean; openingStock?: number;
+}
+export interface RawMaterialMovement {
+  id: number; rawMaterialId: number; materialName?: string; unit?: string; movementType: string; quantityDelta: number; stockAfter: number; unitCost?: number | null;
+  supplierName?: string; refType?: string; refId?: number; refNumber?: string; note?: string; createdByName?: string; createdAt: string;
+}
+export interface BomLine { rawMaterialId: number; code?: string; name?: string; unit?: string; quantity: number; wastagePercent: number; unitCost?: number | null; stock?: number; grossQuantity: number; lineCost?: number | null }
+export interface Bom { variantId: number; productName?: string; sku?: string; labourCost: number; otherCost: number; notes?: string; lines: BomLine[]; materialCost: number; totalCost: number; sellingPrice?: number; netPrice?: number; gstRate: number }
+export interface BomSummary { variantId: number; productName: string; sku: string; materials: number; totalCost?: number | null; sellingPrice?: number; netPrice?: number; updatedAt: string }
+export interface ProductionMaterial { id: number; rawMaterialId: number; code?: string; name?: string; unit?: string; quantityRequired: number; quantityIssued: number; stock?: number; pending: number }
+export interface ProductionOrder {
+  id: number; number: string; customOrderId?: number; customOrderNumber?: string; customerName?: string; variantId?: number; sku?: string; description: string; quantity: number;
+  status: string; priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT'; dueDate?: string; assignedTo?: string; warehouseId?: number; warehouseName?: string; labourCost?: number | null;
+  otherCost?: number | null; materialCost?: number | null; totalCost?: number | null; notes?: string; startedAt?: string; completedAt?: string; cancelReason?: string;
+  createdByName?: string; createdAt: string; materialLines: number; materialsShort: number; materials: ProductionMaterial[];
+}

@@ -52,4 +52,18 @@ public static class Perm
     public const string AuditView = "audit.view";
     public const string SettingsManage = "settings.manage";
     public const string BackupManage = "backup.manage";
+    public const string WarehouseManage = "warehouse.manage";
+    public const string RawMaterialView = "rawmaterial.view";
+    public const string RawMaterialManage = "rawmaterial.manage";
+    public const string ProductionView = "production.view";
+    public const string ProductionManage = "production.manage";
+    public const string WarrantyView = "warranty.view";
+    public const string ServiceView = "service.view";
+    public const string ServiceManage = "service.manage";
+    public const string LeadView = "lead.view";
+    public const string LeadManage = "lead.manage";
+    public const string CashManage = "cash.manage";
+    public const string CashApprove = "cash.approve";
+    public const string CreditOverride = "credit.override";
+    public const string ProductImport = "product.import";
 }

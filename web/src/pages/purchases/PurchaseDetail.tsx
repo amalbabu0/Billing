@@ -85,7 +85,7 @@ export default function PurchaseDetail() {
               {data.payments.map(sp => <li key={sp.id} className="row between text-sm" style={{ opacity: sp.isVoided ? 0.5 : 1 }}><span><DocNo>{sp.number}</DocNo> <span className="muted">{date(sp.paymentDate)} · {sp.methodCode}</span></span><Money value={sp.amountApplied ?? sp.amount} /></li>)}
             </ul>}
           </Card>
-          <Card title="Record"><p className="text-sm soft">Entered by {p.createdByName ?? '—'} · {dateTime(p.createdAt)}</p>{p.completedAt && <p className="text-sm soft">Stock received {dateTime(p.completedAt)}</p>}{p.notes && <p className="text-sm" style={{ marginTop: 8 }}>{p.notes}</p>}</Card>
+          <Card title="Record"><p className="text-sm soft">Entered by {p.createdByName ?? '—'} · {dateTime(p.createdAt)}</p>{p.completedAt && <p className="text-sm soft">Stock received {dateTime(p.completedAt)}{p.warehouseName ? ` into ${p.warehouseName}` : ""}</p>}{p.notes && <p className="text-sm" style={{ marginTop: 8 }}>{p.notes}</p>}</Card>
         </aside>
       </div>
       {pay && <SupplierPayModal open onClose={() => setPay(false)} supplierId={p.supplierId} supplierName={p.supplierName} purchaseId={p.id} amount={p.balance} />}

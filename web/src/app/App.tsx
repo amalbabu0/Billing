@@ -43,6 +43,12 @@ const PurchaseDetail = lazy(() => import('@/pages/purchases/PurchaseDetail'));
 const Suppliers = lazy(() => import('@/pages/purchases/Suppliers'));
 const SupplierLedger = lazy(() => import('@/pages/purchases/SupplierLedger'));
 const SupplierPayments = lazy(() => import('@/pages/purchases/SupplierPayments'));
+const Locations = lazy(() => import('@/pages/inventory/Locations'));
+const Transfers = lazy(() => import('@/pages/inventory/Transfers'));
+const RawMaterials = lazy(() => import('@/pages/production/RawMaterials'));
+const Boms = lazy(() => import('@/pages/production/Boms'));
+const BomEditor = lazy(() => import('@/pages/production/Boms').then(m => ({ default: m.BomEditor })));
+const Production = lazy(() => import('@/pages/production/Production'));
 const CustomOrders = lazy(() => import('@/pages/custom/CustomOrders'));
 const CustomOrderEditor = lazy(() => import('@/pages/custom/CustomOrderEditor'));
 const CustomOrderDetail = lazy(() => import('@/pages/custom/CustomOrderDetail'));
@@ -124,6 +130,14 @@ function Gate() {
           <Route path="inventory/movements" element={<Page perms={[P.InventoryView]}><Movements mode="all" /></Page>} />
           <Route path="inventory/adjustments" element={<Page perms={[P.InventoryView]}><Movements mode="adjustments" /></Page>} />
           <Route path="inventory/reserved" element={<Page perms={[P.InventoryView]}><Reserved /></Page>} />
+          <Route path="inventory/locations" element={<Page perms={[P.InventoryView]}><Locations /></Page>} />
+          <Route path="inventory/transfers" element={<Page perms={[P.InventoryView, P.WarehouseManage]}><Transfers /></Page>} />
+          <Route path="production" element={<Page perms={[P.ProductionView]}><Production mode="board" /></Page>} />
+          <Route path="production/orders" element={<Page perms={[P.ProductionView]}><Production mode="list" /></Page>} />
+          <Route path="production/materials" element={<Page perms={[P.RawMaterialView, P.ProductionView]}><RawMaterials view="materials" /></Page>} />
+          <Route path="production/materials/movements" element={<Page perms={[P.RawMaterialView, P.ProductionView]}><RawMaterials view="movements" /></Page>} />
+          <Route path="production/boms" element={<Page perms={[P.RawMaterialView, P.ProductionView]}><Boms /></Page>} />
+          <Route path="production/boms/:variantId" element={<Page perms={[P.RawMaterialView, P.ProductionView]}><BomEditor /></Page>} />
 
           <Route path="purchases" element={<Page perms={[P.PurchaseView]}><Purchases /></Page>} />
           <Route path="purchases/new" element={<Page perms={[P.PurchaseManage]}><PurchaseEditor /></Page>} />

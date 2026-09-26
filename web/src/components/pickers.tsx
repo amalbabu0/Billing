@@ -1,11 +1,11 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarDays, Package, Plus, Search, User, X } from 'lucide-react';
+import { CalendarDays, Layers, Package, Plus, Search, User, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useDebounced } from '@/lib/hooks';
 import { rangeFor } from '@/lib/hooks';
 import { money, date as fmtDate } from '@/lib/format';
-import type { Customer, Sellable, Supplier } from '@/lib/types';
+import type { Customer, Paged, RawMaterial, Sellable, Supplier } from '@/lib/types';
 import { StockLevel } from './ui/display';
 
 /**
@@ -227,5 +227,22 @@ export function DateRange({ value, onChange, presets = ['today', 'yesterday', '7
         <span className="text-xs muted desktop-only">{fmtDate(value.from)} – {fmtDate(value.to)}</span>
       )}
     </div>
+  );
+}
+
+// ------------------------------------------------------------ raw material
+export function RawMaterialPicker({ onPick, label = 'Add material', autoFocus }: { onPick: (m: RawMaterial) => void; label?: string; autoFocus?: boolean }) {
+  const [text, setText] = useState('');
+  const q = useDebounced(text, 160);
+  const { data, isFetching } = useQuery({ queryKey: ['rm-pick', q], queryFn: () => api.get<Paged<RawMaterial>>('/api/raw-materials', { search: q, pageSize: 20 }), staleTime: 20_000 });
+  return (
+    <Combobox label={label} placeholder="Search raw material" icon={<Layers />} results={data?.items ?? []} loading={isFetching} onSearch={setText} onPick={onPick} autoFocus={autoFocus}
+      itemKey={m => m.id}
+      renderItem={m => (
+        <div className="row gap-3" style={{ width: '100%' }}>
+          <div className="grow" style={{ minWidth: 0 }}><div className="medium truncate">{m.name}</div><div className="text-xs muted"><span className="mono">{m.code}</span> · {m.category}</div></div>
+          <span className={`text-xs ${m.isLow ? 't-bad' : 'muted'}`}>{m.stock.toLocaleString('en-IN', { maximumFractionDigits: 3 })} {m.unit}</span>
+        </div>
+      )} />
   );
 }

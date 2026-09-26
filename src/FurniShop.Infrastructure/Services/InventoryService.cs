@@ -37,7 +37,7 @@ public sealed class InventoryService(Db db, UserSession session, AuditService au
 {
     internal async Task<StockLevels> ApplyAsync(NpgsqlConnection conn, NpgsqlTransaction tx, long variantId, string movementType,
         decimal onHandDelta, decimal reservedDelta, decimal damagedDelta, string? refType, long? refId, string? refNumber,
-        string? note = null, decimal? unitCost = null)
+        string? note = null, decimal? unitCost = null, long? warehouseId = null)
     {
         var allowNegative = (await SettingsService.LoadAsync(conn, tx)).Inventory.AllowNegativeStock;
 
@@ -65,12 +65,15 @@ public sealed class InventoryService(Db db, UserSession session, AuditService au
             update inventory set on_hand = @onHand, reserved = @reserved, damaged = @damaged, updated_at = now() where variant_id = @variantId
             """, new { onHand, reserved, damaged, variantId }, tx);
 
+        var location = await ApplyLocationAsync(conn, tx, variantId, warehouseId, onHandDelta, damagedDelta,
+            strict: movementType == MovementType.TransferOut, allowNegative, label);
+
         await conn.ExecuteAsync("""
             insert into inventory_movements (variant_id, movement_type, on_hand_delta, reserved_delta, damaged_delta,
-                on_hand_after, reserved_after, damaged_after, unit_cost, ref_type, ref_id, ref_number, note, created_by)
+                on_hand_after, reserved_after, damaged_after, unit_cost, ref_type, ref_id, ref_number, note, created_by, warehouse_id)
             values (@variantId, @movementType, @onHandDelta, @reservedDelta, @damagedDelta, @onHand, @reserved, @damaged,
-                @unitCost, @refType, @refId, @refNumber, @note, @uid)
-            """, new { variantId, movementType, onHandDelta, reservedDelta, damagedDelta, onHand, reserved, damaged, unitCost, refType, refId, refNumber, note, uid = session.UserId }, tx);
+                @unitCost, @refType, @refId, @refNumber, @note, @uid, @location)
+            """, new { variantId, movementType, onHandDelta, reservedDelta, damagedDelta, onHand, reserved, damaged, unitCost, refType, refId, refNumber, note, uid = session.UserId, location }, tx);
 
         if (onHandDelta < 0 || reservedDelta > 0)
         {
@@ -89,6 +92,60 @@ public sealed class InventoryService(Db db, UserSession session, AuditService au
                 }, tx);
         }
         return new StockLevels(onHand, reserved, damaged);
+    }
+
+    internal static Task<long> DefaultWarehouseAsync(NpgsqlConnection conn, NpgsqlTransaction? tx) =>
+        conn.ExecuteScalarAsync<long>("select id from warehouses where is_default", transaction: tx);
+
+    /// <summary>
+    /// Keeps per-location stock in step with the totals. Incoming stock lands in the given (or default) location.
+    /// Outgoing stock is taken from that location first, then from the others with the most stock, so a sale is never
+    /// blocked just because goods sit in the godown; a transfer (strict) must come from its own location.
+    /// </summary>
+    private static async Task<long> ApplyLocationAsync(NpgsqlConnection conn, NpgsqlTransaction tx, long variantId, long? warehouseId,
+        decimal onHandDelta, decimal damagedDelta, bool strict, bool allowNegative, string label)
+    {
+        var wh = warehouseId ?? await DefaultWarehouseAsync(conn, tx);
+        if (onHandDelta == 0 && damagedDelta == 0) return wh;
+        await conn.ExecuteAsync("insert into warehouse_stock (warehouse_id, variant_id) values (@wh, @variantId) on conflict do nothing", new { wh, variantId }, tx);
+        var rows = (await conn.QueryAsync<(long Warehouse, decimal OnHand, decimal Damaged)>(
+            "select warehouse_id, on_hand, damaged from warehouse_stock where variant_id = @variantId order by (warehouse_id = @wh) desc, on_hand desc for update",
+            new { variantId, wh }, tx)).ToList();
+
+        async Task Take(string column, decimal amount, Func<(long Warehouse, decimal OnHand, decimal Damaged), decimal> have)
+        {
+            var need = amount;
+            foreach (var r in rows)
+            {
+                if (need <= 0) break;
+                if (strict && r.Warehouse != wh) continue;
+                var take = Math.Min(need, Math.Max(0, have(r)));
+                if (take <= 0) continue;
+                await conn.ExecuteAsync($"update warehouse_stock set {column} = {column} - @take, updated_at = now() where warehouse_id = @w and variant_id = @variantId",
+                    new { take, w = r.Warehouse, variantId }, tx);
+                need -= take;
+            }
+            if (need > 0)
+            {
+                if (strict || column == "damaged" || !allowNegative)
+                {
+                    var name = await conn.ExecuteScalarAsync<string>("select name from warehouses where id = @wh", new { wh }, tx);
+                    throw new BusinessRuleException(strict
+                        ? $"Only {Math.Max(0, have(rows.First(r => r.Warehouse == wh))):0.##} unit(s) of {label} are at {name}."
+                        : $"Location stock for {label} does not cover this movement.");
+                }
+                await conn.ExecuteAsync($"update warehouse_stock set {column} = {column} - @need, updated_at = now() where warehouse_id = @wh and variant_id = @variantId",
+                    new { need, wh, variantId }, tx);
+            }
+        }
+
+        if (onHandDelta > 0)
+            await conn.ExecuteAsync("update warehouse_stock set on_hand = on_hand + @onHandDelta, updated_at = now() where warehouse_id = @wh and variant_id = @variantId", new { onHandDelta, wh, variantId }, tx);
+        else if (onHandDelta < 0) await Take("on_hand", -onHandDelta, r => r.OnHand);
+        if (damagedDelta > 0)
+            await conn.ExecuteAsync("update warehouse_stock set damaged = damaged + @damagedDelta, updated_at = now() where warehouse_id = @wh and variant_id = @variantId", new { damagedDelta, wh, variantId }, tx);
+        else if (damagedDelta < 0) await Take("damaged", -damagedDelta, r => r.Damaged);
+        return wh;
     }
 
     internal static Task<bool> IsStockItemAsync(NpgsqlConnection conn, NpgsqlTransaction tx, long variantId) =>
@@ -194,19 +251,19 @@ public sealed class InventoryService(Db db, UserSession session, AuditService au
             switch (input.AdjustmentType)
             {
                 case AdjustmentType.Increase:
-                    after = await ApplyAsync(conn, tx, input.VariantId, MovementType.AdjustmentIn, q, 0, 0, DocType.Adjustment, id, number, input.Reason, input.UnitCost);
+                    after = await ApplyAsync(conn, tx, input.VariantId, MovementType.AdjustmentIn, q, 0, 0, DocType.Adjustment, id, number, input.Reason, input.UnitCost, input.WarehouseId);
                     break;
                 case AdjustmentType.Decrease:
-                    after = await ApplyAsync(conn, tx, input.VariantId, MovementType.AdjustmentOut, -q, 0, 0, DocType.Adjustment, id, number, input.Reason);
+                    after = await ApplyAsync(conn, tx, input.VariantId, MovementType.AdjustmentOut, -q, 0, 0, DocType.Adjustment, id, number, input.Reason, null, input.WarehouseId);
                     break;
                 case AdjustmentType.MarkDamaged:
-                    after = await ApplyAsync(conn, tx, input.VariantId, MovementType.Damage, -q, 0, q, DocType.Adjustment, id, number, input.Reason);
+                    after = await ApplyAsync(conn, tx, input.VariantId, MovementType.Damage, -q, 0, q, DocType.Adjustment, id, number, input.Reason, null, input.WarehouseId);
                     break;
                 case AdjustmentType.DamageRepaired:
-                    after = await ApplyAsync(conn, tx, input.VariantId, MovementType.DamageRepaired, q, 0, -q, DocType.Adjustment, id, number, input.Reason);
+                    after = await ApplyAsync(conn, tx, input.VariantId, MovementType.DamageRepaired, q, 0, -q, DocType.Adjustment, id, number, input.Reason, null, input.WarehouseId);
                     break;
                 case AdjustmentType.DamageWriteOff:
-                    after = await ApplyAsync(conn, tx, input.VariantId, MovementType.DamageWriteOff, 0, 0, -q, DocType.Adjustment, id, number, input.Reason);
+                    after = await ApplyAsync(conn, tx, input.VariantId, MovementType.DamageWriteOff, 0, 0, -q, DocType.Adjustment, id, number, input.Reason, null, input.WarehouseId);
                     break;
                 case AdjustmentType.SetDisplay:
                     var onHand = await conn.ExecuteScalarAsync<decimal>("select on_hand from inventory where variant_id = @VariantId for update", input, tx);

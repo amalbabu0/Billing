@@ -16,6 +16,7 @@ if (cmd is "help" or "--help" || cs is null)
           migrate       --db <conn>                                   apply database migrations
           create-admin  --db <conn> --user <u> --name <n> --password <p>
           seed-demo     --db <conn> --user <admin> --password <p>      load demo data into an empty database
+          seed-extras   --db <conn> --user <admin> --password <p>      add demo data for newer modules to an existing demo database
           sample-pdfs   --db <conn> --user <u> --password <p> --out <dir>
         The connection string can also be supplied in the FURNISHOP_DB environment variable.
         Neon example: Host=ep-xxx-pooler.ap-south-1.aws.neon.tech;Database=neondb;Username=neondb_owner;Password=...;SSL Mode=Require
@@ -38,10 +39,16 @@ try
             Console.WriteLine("Administrator created.");
             break;
         case "seed-demo":
+        case "seed-extras":
         case "sample-pdfs":
             var login = await app.Auth.LoginAsync(Opt("user") ?? "admin", Opt("password") ?? "");
             if (login.Outcome != FurniShop.Infrastructure.Services.LoginOutcome.Success) { Console.Error.WriteLine(login.Message); return 2; }
-            if (cmd == "seed-demo")
+            if (cmd == "seed-extras")
+            {
+                await app.Migrator.MigrateAsync();
+                await new DemoOperationsSeeder(app).SeedAsync(new Progress<string>(Console.WriteLine));
+            }
+            else if (cmd == "seed-demo")
             {
                 await new DemoDataSeeder(app).SeedAsync(new Progress<string>(Console.WriteLine));
                 Console.WriteLine($"Demo users: manager / sales1 / sales2 / delivery1 / accounts — password {DemoDataSeeder.DemoPassword}");

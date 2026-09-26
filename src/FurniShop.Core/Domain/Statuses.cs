@@ -20,6 +20,11 @@ public static class DocType
     public const string Supplier = "SUPPLIER";
     public const string DebitNote = "DEBIT_NOTE";
     public const string OnAccount = "ON_ACCOUNT";
+    public const string Transfer = "TRANSFER";
+    public const string ProductionOrder = "PRODUCTION_ORDER";
+    public const string Warranty = "WARRANTY";
+    public const string Service = "SERVICE";
+    public const string Lead = "LEAD";
 }
 
 public static class InvoiceStatus
@@ -176,6 +181,9 @@ public static class MovementType
     public const string PurchaseCancelOut = "PURCHASE_CANCEL_OUT";
     public const string Display = "DISPLAY";
     public const string PurchaseReturnOut = "PURCHASE_RETURN_OUT";
+    public const string TransferOut = "TRANSFER_OUT";
+    public const string TransferIn = "TRANSFER_IN";
+    public const string ProductionIn = "PRODUCTION_IN";
 }
 
 public static class AdjustmentType
