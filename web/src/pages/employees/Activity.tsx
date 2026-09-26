@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { History } from 'lucide-react';
 import { dateTime } from '@/lib/format';
 import { usePagedList } from '@/lib/useList';
@@ -9,15 +11,16 @@ import { Badge, EmptyState, KV, PageHeader } from '@/components/ui/display';
 import { SearchInput } from '@/components/ui/form';
 import { Drawer } from '@/components/ui/overlay';
 
-const MODULES = ['Sales', 'Payments', 'Customers', 'Products', 'Inventory', 'Purchases', 'Custom Orders', 'Delivery', 'Installation', 'Expenses', 'GST', 'Reports', 'Employees', 'Settings', 'Security', 'Backup'];
+const MODULES = ['Sales', 'Payments', 'Customers', 'Products', 'Inventory', 'Purchases', 'Custom Orders', 'Production', 'Delivery', 'Installation', 'Service', 'Warranty', 'Expenses', 'GST', 'Reports', 'Employees', 'Settings', 'Security', 'Backup'];
 const TONE: Record<string, 'ok' | 'warn' | 'bad' | 'info' | 'muted'> = { CREATE: 'ok', UPDATE: 'info', DELETE: 'bad', CANCEL: 'bad', VOID: 'bad', LOGIN: 'muted', LOGOUT: 'muted', LOGIN_FAILED: 'warn', EXPORT: 'warn', ADJUST: 'warn', REFUND: 'warn' };
 
 /** Append-only audit trail: who did what, when, from where — with before/after values for edits. */
 export default function Activity() {
   const { data: lookups } = useLookups();
-  const list = usePagedList<AuditLog>('audit', '/api/audit', { filterKeys: ['module', 'userId', 'from', 'to'], defaults: { pageSize: 50 } });
+  const list = usePagedList<AuditLog>('audit', '/api/audit', { filterKeys: ['module', 'action', 'userId', 'from', 'to'], defaults: { pageSize: 50 } });
   const { state, update } = list;
   const [open, setOpen] = useState<AuditLog | null>(null);
+  const actions = useQuery({ queryKey: ['audit-actions'], queryFn: () => api.get<string[]>('/api/audit/actions'), staleTime: 300_000 });
   const cols: Column<AuditLog>[] = [
     { key: 'when', header: 'When', fixed: true, mobile: 'meta', render: r => <span className="nowrap">{dateTime(r.occurredAt)}</span>, exportValue: r => dateTime(r.occurredAt) },
     { key: 'user', header: 'User', mobile: 'title', render: r => <span className="medium">{r.username ?? 'system'}</span>, exportValue: r => r.username },
@@ -35,6 +38,9 @@ export default function Activity() {
           <SearchInput value={state.search} onChange={x => update({ search: x })} placeholder="Summary or document number" />
           <select className="select input-sm" style={{ width: 160 }} aria-label="Module" value={state.filters.module ?? ''} onChange={e => update({ filters: { module: e.target.value || undefined } })}>
             <option value="">All modules</option>{MODULES.map(m => <option key={m}>{m}</option>)}
+          </select>
+          <select className="select input-sm" style={{ width: 150 }} aria-label="Action" value={state.filters.action ?? ''} onChange={e => update({ filters: { action: e.target.value || undefined } })}>
+            <option value="">All actions</option>{(actions.data ?? []).map(a => <option key={a} value={a}>{a.replace(/_/g, ' ').toLowerCase()}</option>)}
           </select>
           <select className="select input-sm" style={{ width: 160 }} aria-label="User" value={state.filters.userId ?? ''} onChange={e => update({ filters: { userId: e.target.value || undefined } })}>
             <option value="">All users</option>{(lookups?.staff ?? []).map(s => <option key={s.id} value={s.id}>{s.fullName}</option>)}

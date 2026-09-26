@@ -57,6 +57,7 @@ public sealed class QuotationService(Db db, UserSession session, AuditService au
                 id = input.Id;
             }
             await SalesDocumentBuilder.InsertLinesAsync(conn, tx, "quotation_items", "quotation_id", id, built.Lines);
+            await SalesDocumentBuilder.SetSalespersonAsync(conn, tx, "quotations", id, input, session.UserId);
             await audit.LogAsync(conn, tx, input.Id == 0 ? "CREATE" : "UPDATE", "Sales",
                 $"{(input.Id == 0 ? "created" : "updated")} quotation {number} for {built.Customer.Name} — {Money.Format(built.Totals.GrandTotal)}",
                 "quotation", id, number, null, new { built.Totals.GrandTotal, Lines = built.Lines.Count });
@@ -116,7 +117,7 @@ public sealed class QuotationService(Db db, UserSession session, AuditService au
         await using var conn = await db.OpenAsync();
         var q = await conn.QuerySingleOrDefaultAsync<Quotation>("""
             select q.*, q.quote_date as date, c.name as customer_name, c.mobile as customer_mobile, c.gstin as customer_gstin,
-                   concat_ws(', ', c.billing_address, c.city, c.state, c.pincode) as billing_address, so.number as sales_order_number, u.full_name as created_by_name
+                   concat_ws(', ', c.billing_address, c.city, c.state, c.pincode) as billing_address, so.number as sales_order_number, u.full_name as created_by_name, (select full_name from users sp where sp.id = q.salesperson_id) as salesperson_name
             from quotations q join customers c on c.id = q.customer_id left join sales_orders so on so.id = q.sales_order_id left join users u on u.id = q.created_by
             where q.id = @id
             """, new { id }) ?? throw new NotFoundException("Quotation", id);
@@ -137,7 +138,7 @@ public sealed class QuotationService(Db db, UserSession session, AuditService au
         await using var conn = await db.OpenAsync();
         var total = await conn.ExecuteScalarAsync<int>($"select count(*) from quotations q join customers c on c.id = q.customer_id {where}", args);
         var rows = await conn.QueryAsync<Quotation>($"""
-            select q.*, q.quote_date as date, c.name as customer_name, c.mobile as customer_mobile, so.number as sales_order_number, u.full_name as created_by_name
+            select q.*, q.quote_date as date, c.name as customer_name, c.mobile as customer_mobile, so.number as sales_order_number, u.full_name as created_by_name, (select full_name from users sp where sp.id = q.salesperson_id) as salesperson_name
             from quotations q join customers c on c.id = q.customer_id left join sales_orders so on so.id = q.sales_order_id left join users u on u.id = q.created_by
             {where} order by q.quote_date desc, q.id desc limit @PageSize offset @Offset
             """, args);
@@ -218,6 +219,7 @@ public sealed class SalesOrderService(Db db, UserSession session, AuditService a
             id = input.Id;
         }
         await SalesDocumentBuilder.InsertLinesAsync(conn, tx, "sales_order_items", "sales_order_id", id, built.Lines, "source_quotation_item_id");
+        await SalesDocumentBuilder.SetSalespersonAsync(conn, tx, "sales_orders", id, input, session.UserId);
         if (status is SalesOrderStatus.Confirmed or SalesOrderStatus.Processing)
             await ReserveAsync(conn, tx, id, number);
 
@@ -376,7 +378,7 @@ public sealed class SalesOrderService(Db db, UserSession session, AuditService a
     private const string Select = """
         select so.*, so.order_date as date, c.name as customer_name, c.mobile as customer_mobile, c.gstin as customer_gstin,
                concat_ws(', ', c.billing_address, c.city, c.state, c.pincode) as billing_address,
-               q.number as quotation_number, i.number as invoice_number, u.full_name as created_by_name,
+               q.number as quotation_number, i.number as invoice_number, u.full_name as created_by_name, (select full_name from users sp where sp.id = so.salesperson_id) as salesperson_name,
                coalesce((select sum(case when p.direction = 'IN' then a.amount else -a.amount end) from payment_allocations a
                          join payments p on p.id = a.payment_id and not p.is_voided where a.doc_type = 'SALES_ORDER' and a.doc_id = so.id), 0)
                + coalesce((select paid from v_invoice_balances b where b.invoice_id = so.invoice_id), 0) as advance_paid,

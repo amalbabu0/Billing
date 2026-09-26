@@ -246,3 +246,100 @@ public class ServiceCrmCashTests(DbFixture f) : IClassFixture<DbFixture>
         Assert.Equal(expected - 200, (await f.App.Cash.DayAsync(day.AddDays(1))).SuggestedOpening);
     }
 }
+
+public class PricingImportLifecycleTests(DbFixture f) : IClassFixture<DbFixture>
+{
+    [DbFact]
+    public async Task Group_discount_and_measured_rate_are_allowed_prices_for_sales_staff_and_commission_follows_salesperson()
+    {
+        var v = await f.ProductAsync("GRP-1", 10000, 6000, 10, discount: 5);
+        var glass = await f.ProductAsync("GLASS-SQFT", 0, 0, 0, stockItem: false);
+        var pid = await f.App.Db.ScalarAsync<long>("select product_id from product_variants where id = @glass", new { glass });
+        var prod = await f.App.Catalog.GetProductAsync(pid);
+        prod.Variants[0].PricingMode = "PER_SQFT"; prod.Variants[0].PricingRate = 450;
+        await f.App.Catalog.SaveProductAsync(prod);
+        Assert.Equal("PER_SQFT", (await f.App.Catalog.GetSellableAsync(glass))!.PricingMode);
+
+        var roles = (await f.App.Users.RolesAsync()).ToDictionary(r => r.Code, r => r.Id);
+        var sid = await f.App.Users.SaveAsync(new User { Username = "sales.grp", FullName = "Group Seller", RoleId = roles["SALES"], IsActive = true, CommissionPercent = 2 }, "Sales@2026");
+        var dealer = await f.App.Customers.SaveAsync(new Customer { Name = "Dealer Co", Mobile = "9876566666", StateCode = "29", CustomerGroup = "DEALER" });
+        var retail = await f.CustomerAsync("Retail Buyer", "9876577777");
+        Assert.Equal(15m, (await f.App.Customers.GetAsync(dealer)).GroupDiscount);
+
+        await using var staff = new FurniShop.Infrastructure.AppServices(f.ConnectionString);
+        Assert.Equal(LoginOutcome.Success, (await staff.Auth.LoginAsync("sales.grp", "Sales@2026")).Outcome);
+        LineInput Line(decimal disc) => new() { VariantId = v, Quantity = 1, UnitPrice = 10000, GstRate = 18, DiscountPercent = disc };
+        // Retail: only the product's 5%. Dealer group: 15%.
+        await Assert.ThrowsAsync<PermissionDeniedException>(() => staff.Invoices.SaveDraftAsync(new SalesDocumentInput { CustomerId = retail, Lines = { Line(15) } }));
+        var sale = await staff.Invoices.CheckoutAsync(new SalesDocumentInput { CustomerId = dealer, Lines = { Line(15) } }, new[] { DbFixture.Pay(PaymentMethodCode.Cash, 8500) });
+        Assert.Equal(sid, await f.App.Db.ScalarAsync<long?>("select salesperson_id from invoices where id = @id", new { id = sale.InvoiceId }));
+
+        // Measured item: 6 ft × 3 ft = 18 sq.ft at ₹450 is fine; a lower rate is not.
+        var ok = new LineInput { VariantId = glass, Description = "Toughened glass top (6 ft × 3 ft = 18 sq.ft)", Quantity = 18, UnitPrice = 450, GstRate = 18 };
+        await staff.Invoices.SaveDraftAsync(new SalesDocumentInput { CustomerId = retail, Lines = { ok } });
+        ok.UnitPrice = 300;
+        await Assert.ThrowsAsync<PermissionDeniedException>(() => staff.Invoices.SaveDraftAsync(new SalesDocumentInput { CustomerId = retail, Lines = { ok } }));
+
+        var report = await f.App.Reports.RunAsync("sales.commission", new ReportFilter { From = DateTime.Today, To = DateTime.Today });
+        var row = report.Table.Rows.Cast<System.Data.DataRow>().Single(r => (string)r["Salesperson"] == "Group Seller");
+        var net = await f.App.Db.ScalarAsync<decimal>("select taxable_total from invoices where id = @id", new { id = sale.InvoiceId });
+        Assert.Equal(Math.Round(net * 0.02m, 2), (decimal)row["Commission"]);
+    }
+
+    [DbFact]
+    public async Task Product_import_previews_validates_and_creates_or_updates_and_bulk_update_changes_prices()
+    {
+        await f.ProductAsync("IMP-OLD", 20000, 12000, 3);
+        var csv = """
+            Code,Name,Category,Brand,Selling price,GST %,Cost price,Opening stock,Warranty months,Price includes GST
+            IMP-NEW,"Bookshelf, 5 tier",Storage,Nilkamal,"8,500",18,5000,4,12,Yes
+            IMP-OLD,Renamed old product,Sofa,,21000,18,,2,,Yes
+            IMP-BAD,,Storage,,abc,7,,,,
+            IMP-NEW,Duplicate,Storage,,100,18,,,,
+            """;
+        var preview = await f.App.ProductImport.PreviewAsync(System.Text.Encoding.UTF8.GetBytes(csv), "products.csv");
+        Assert.Equal(("CREATE", "UPDATE", "ERROR", "ERROR"), (preview.Rows[0].Action, preview.Rows[1].Action, preview.Rows[2].Action, preview.Rows[3].Action));
+        Assert.Contains(preview.Rows[2].Errors, e => e.Contains("Name"));
+        Assert.Contains(preview.Rows[2].Errors, e => e.Contains("GST 7%"));
+        Assert.Contains(preview.Rows[1].Warnings, w => w.Contains("Opening stock is ignored"));
+        Assert.Contains("Storage", preview.NewCategories);
+        Assert.Equal(8500m, preview.Rows[0].SellingPrice);
+
+        var result = await f.App.ProductImport.CommitAsync(preview.Rows);
+        Assert.Equal((1, 1), (result.Created, result.Updated));
+        var created = (await f.App.Catalog.SearchSellableAsync("IMP-NEW")).Single();
+        Assert.Equal(("Bookshelf, 5 tier", 4m), (created.ProductName, created.OnHand));
+        var old = (await f.App.Catalog.SearchSellableAsync("IMP-OLD")).Single();
+        Assert.Equal(("Renamed old product", 21000m, 3m), (old.ProductName, old.SellingPrice, old.OnHand)); // stock untouched
+
+        var n = await f.App.ProductImport.BulkUpdateAsync(new BulkProductUpdate { ProductIds = { created.ProductId, old.ProductId }, Action = "PRICE_PERCENT", Value = 10 });
+        Assert.Equal(2, n);
+        Assert.Equal(23100m, (await f.App.Catalog.GetSellableAsync(old.VariantId))!.SellingPrice);
+        await Assert.ThrowsAsync<ValidationException>(() => f.App.ProductImport.BulkUpdateAsync(new BulkProductUpdate { ProductIds = { old.ProductId }, Action = "GST", Value = 7 }));
+    }
+
+    [DbFact]
+    public async Task Order_360_follows_quotation_to_order_advance_invoice_delivery_and_warranty()
+    {
+        var v = await f.ProductAsync("L360-1", 30000, 18000, 5);
+        var pid = await f.App.Db.ScalarAsync<long>("select product_id from product_variants where id = @v", new { v });
+        await f.App.Db.ExecuteAsync("update products set warranty_months = 12 where id = @pid", new { pid });
+        var c = await f.CustomerAsync("Lifecycle Customer", "9876588888");
+        var q = await f.App.Quotations.SaveAsync(new SalesDocumentInput { CustomerId = c, Lines = { await f.LineAsync(v) }, RequiresDelivery = true });
+        var so = await f.App.Quotations.ConvertToSalesOrderAsync(q, DateTime.Today.AddDays(7), true);
+        await f.App.Payments.ReceiveAsync(new PaymentInput { CustomerId = c, DocType = DocType.SalesOrder, DocId = so, Lines = { DbFixture.Pay(PaymentMethodCode.Upi, 10000, "ADV") } });
+        var inv = await f.App.SalesOrders.ConvertToInvoiceAsync(so, new[] { DbFixture.Pay(PaymentMethodCode.Cash, 20000) });
+
+        foreach (var (kind, id) in new[] { ("QUOTATION", q), ("SALES_ORDER", so), ("INVOICE", inv.InvoiceId) })
+        {
+            var life = await f.App.Lifecycle.ForAsync(kind, id);
+            Assert.Equal(c, life.CustomerId);
+            var stages = life.Stages.ToDictionary(s => s.Key, s => s.State);
+            Assert.Equal(("done", "done", "done", "done", "done"), (stages["QUOTATION"], stages["ORDER"], stages["ADVANCE"], stages["INVOICE"], stages["PAYMENT"]));
+            Assert.Equal("done", stages["WARRANTY"]);
+            Assert.Equal(0m, life.Balance);
+            Assert.Equal(2, life.Documents["payments"].Count);
+            Assert.Contains(life.Events, e => e.Kind == "INVOICE");
+        }
+    }
+}

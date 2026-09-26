@@ -18,7 +18,7 @@ import { CustomerPicker } from '@/components/pickers';
 import { QuickCustomerModal } from '@/components/CustomerForm';
 import { WhatsAppDialog } from '@/components/DocActions';
 
-interface BillLine extends LineInput { key: string; productId?: number; productName: string; variantName: string; available?: number; isStockItem?: boolean; listPrice: number }
+interface BillLine extends LineInput { key: string; productId?: number; productName: string; variantName: string; available?: number; isStockItem?: boolean; listPrice: number; baseDiscount?: number; autoDiscount?: boolean }
 interface Tender { key: string; methodCode: string; amount: number | null; reference: string; auto?: boolean }
 interface Bill {
   customer: Customer | null; lines: BillLine[]; tenders: Tender[]; credit: boolean; useAdvance: boolean;
@@ -42,7 +42,7 @@ export default function Pos() {
   const qc = useQueryClient();
   const { data: lookups } = useLookups();
   const [bill, setBill] = useState<Bill>(() => {
-    try { const raw = sessionStorage.getItem(STORE_KEY); if (raw && !draftId) return JSON.parse(raw) as Bill; } catch { /* ignore */ }
+    try { const raw = localStorage.getItem(STORE_KEY); if (raw && !draftId) return JSON.parse(raw) as Bill; } catch { /* ignore */ }
     return blankBill();
   });
   const [tab, setTab] = useState<'add' | 'items' | 'pay'>('add');
@@ -52,7 +52,15 @@ export default function Pos() {
   const [lastInvoice, setLastInvoice] = useState<CheckoutResult | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { try { sessionStorage.setItem(STORE_KEY, JSON.stringify(bill)); } catch { /* storage full or blocked */ } }, [bill]);
+  // The bill in progress is kept on this device, so a lost connection or a closed tab never loses a customer's items.
+  useEffect(() => { try { localStorage.setItem(STORE_KEY, JSON.stringify(bill)); } catch { /* storage full or blocked */ } }, [bill]);
+  const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine);
+  useEffect(() => {
+    const on = () => setOnline(true), off = () => setOnline(false);
+    window.addEventListener('online', on); window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
+  const [measure, setMeasure] = useState<Sellable | null>(null);
 
   // Walk-in customer is the default for counter sales.
   const walkIn = useQuery({ queryKey: ['walk-in'], queryFn: () => api.get<Customer>('/api/customers/walk-in'), staleTime: Infinity });
@@ -126,9 +134,10 @@ export default function Pos() {
   }, [grand, advanceUsed, bill.credit, bill.tenders]);
 
   // ---------------------------------------------------------------- line editing
-  const addItem = useCallback((s: Sellable) => {
+  const addItem = useCallback((s: Sellable, measured?: { quantity: number; description: string }) => {
+    if (!measured && s.pricingMode && s.pricingMode !== 'FIXED') { setMeasure(s); return; }
     setBill(b => {
-      const existing = b.lines.find(l => l.variantId === s.variantId);
+      const existing = measured ? undefined : b.lines.find(l => l.variantId === s.variantId);
       if (existing) {
         setFlash(existing.key);
         return { ...b, lines: b.lines.map(l => (l.key === existing.key ? { ...l, quantity: (l.quantity || 0) + 1 } : l)) };
@@ -138,9 +147,10 @@ export default function Pos() {
       return {
         ...b,
         lines: [...b.lines, {
-          key, variantId: s.variantId, productId: s.productId, productName: s.productName, variantName: s.variantName, description: '', sku: s.sku,
-          hsnCode: s.hsnCode, quantity: 1, unitPrice: s.sellingPrice, listPrice: s.sellingPrice, priceIncludesGst: s.priceIncludesGst, gstRate: s.gstRate,
-          discountPercent: s.discountPercent ?? 0, discountAmount: 0, available: s.available, isStockItem: s.isStockItem,
+          key, variantId: s.variantId, productId: s.productId, productName: s.productName, variantName: s.variantName, description: measured?.description ?? '', sku: s.sku,
+          hsnCode: s.hsnCode, quantity: measured?.quantity ?? 1, unitPrice: measured ? s.pricingRate ?? 0 : s.sellingPrice, listPrice: measured ? s.pricingRate ?? 0 : s.sellingPrice,
+          priceIncludesGst: s.priceIncludesGst, gstRate: s.gstRate, baseDiscount: s.discountPercent ?? 0, autoDiscount: true,
+          discountPercent: Math.max(s.discountPercent ?? 0, b.customer?.groupDiscount ?? 0), discountAmount: 0, available: s.available, isStockItem: s.isStockItem,
         }],
       };
     });
@@ -204,7 +214,8 @@ export default function Pos() {
         if (reason) { creditOverride.current = reason; checkout.mutate(mode); }
         return;
       }
-      toast.error(e instanceof ApiError && e.code === 'credit_limit' ? 'Credit limit exceeded' : 'Invoice not saved', errorMessage(e));
+      if (!(e instanceof ApiError)) { toast.error('No connection', 'The bill is kept on this device. Save it again when you are back online.'); return; }
+      toast.error(e.code === 'credit_limit' ? 'Credit limit exceeded' : 'Invoice not saved', errorMessage(e));
     },
   });
   const saveDraft = useMutation({
@@ -236,6 +247,7 @@ export default function Pos() {
           { value: 'add', label: 'Add items', icon: <Plus /> }, { value: 'items', label: `Bill (${fmtQty(itemCount)})`, icon: <ShoppingCart /> }, { value: 'pay', label: 'Pay', icon: <Receipt /> },
         ]} />
       </div>
+      {!online && <div className="pos-offline" role="status">You are offline. This bill is kept on this device — finish it and save when the connection returns.</div>}
       <div className="pos" data-tab={tab}>
         {/* ============================== LEFT: product discovery */}
         <Discovery onAdd={addItem} searchRef={searchRef} onScan={scan} />
@@ -299,11 +311,16 @@ export default function Pos() {
               <div className="row between"><span className="section-title">Customer</span>
                 {can(P.CustomerManage) && <button className="btn btn-link text-sm" onClick={() => setNewCustomer({ open: true })}><UserPlus aria-hidden style={{ width: 14 }} />New</button>}
               </div>
-              <CustomerPicker value={bill.customer} allowWalkIn onChange={c => setBill(b => ({ ...b, customer: c ?? null, useAdvance: false }))}
+              <CustomerPicker value={bill.customer} allowWalkIn onChange={c => setBill(b => ({
+                ...b, customer: c ?? null, useAdvance: false,
+                // Group pricing follows the customer on lines the cashier has not discounted by hand.
+                lines: b.lines.map(l => (l.autoDiscount ? { ...l, discountPercent: Math.max(l.baseDiscount ?? 0, c?.groupDiscount ?? 0), discountAmount: 0 } : l)),
+              }))}
                 onCreate={can(P.CustomerManage) ? name => setNewCustomer({ open: true, name }) : undefined} />
               {bill.customer && !isWalkIn && bill.customer.outstanding > 0 && (
                 <div className="text-xs t-bad">Previous balance due: {money(bill.customer.outstanding)}</div>
               )}
+              {bill.customer && !isWalkIn && (bill.customer.groupDiscount ?? 0) > 0 && <div className="text-xs t-ok">{bill.customer.customerGroupName} pricing — up to {bill.customer.groupDiscount}% off</div>}
               {bill.customer && !isWalkIn && bill.customer.creditLimit > 0 && (() => {
                 const available = bill.customer.creditLimit - Math.max(0, bill.customer.outstanding);
                 const after = available - Math.max(0, balance);
@@ -383,6 +400,7 @@ export default function Pos() {
       <QuickCustomerModal open={newCustomer.open} initialName={newCustomer.name} onClose={() => setNewCustomer({ open: false })}
         onSaved={c => setBill(b => ({ ...b, customer: c }))} />
       <WhatsAppDialog open={wa !== null} onClose={() => setWa(null)} url={`/api/invoices/${wa}/whatsapp`} pdfUrl={`/api/invoices/${wa}/pdf?download=true`} pdfName="invoice.pdf" />
+      {measure && <MeasureModal item={measure} onClose={() => setMeasure(null)} onAdd={m => { addItem(measure, m); setMeasure(null); }} />}
     </>
   );
 }
@@ -427,8 +445,8 @@ function BillLineRow({ line, previewLine, flash, canDiscount, onChange, onRemove
           {line.productId && <VariantSwitch line={line} onChange={onChange} />}
           <div style={{ width: 150 }}><NumberInput label="Unit price" money value={line.unitPrice} onChange={v => onChange({ unitPrice: v ?? 0 })} disabled={!canDiscount}
             hint={!canDiscount ? 'Manager can change price' : line.unitPrice !== line.listPrice ? `List ${money(line.listPrice, { decimals: false })}` : undefined} /></div>
-          <div style={{ width: 110 }}><NumberInput label="Discount %" value={line.discountPercent} min={0} max={100} onChange={v => onChange({ discountPercent: v ?? 0, discountAmount: 0 })} /></div>
-          <div style={{ width: 130 }}><NumberInput label="or ₹ off" money value={line.discountAmount} min={0} onChange={v => onChange({ discountAmount: v ?? 0, discountPercent: 0 })} /></div>
+          <div style={{ width: 110 }}><NumberInput label="Discount %" value={line.discountPercent} min={0} max={100} onChange={v => onChange({ discountPercent: v ?? 0, discountAmount: 0, autoDiscount: false })} /></div>
+          <div style={{ width: 130 }}><NumberInput label="or ₹ off" money value={line.discountAmount} min={0} onChange={v => onChange({ discountAmount: v ?? 0, discountPercent: 0, autoDiscount: false })} /></div>
           {previewLine && <div className="text-xs muted" style={{ paddingBottom: 8 }}>Taxable {money(previewLine.taxableAmount)} · HSN {previewLine.hsnCode ?? '—'}</div>}
         </div>
       )}
@@ -545,5 +563,51 @@ function Discovery({ onAdd, searchRef, onScan }: { onAdd: (s: Sellable) => void;
         )}
       </div>
     </section>
+  );
+}
+
+// ------------------------------------------------------------ measured pricing (per sq.ft, running ft, kg…)
+const MEASURE: Record<string, { unit: string; label: string }> = {
+  PER_SQFT: { unit: 'sq.ft', label: 'Area in square feet' }, PER_SQM: { unit: 'sq.m', label: 'Area in square metres' }, PER_RFT: { unit: 'r.ft', label: 'Running length in feet' },
+  PER_KG: { unit: 'kg', label: 'Weight in kg' }, PER_UNIT: { unit: 'unit', label: 'Number of units' }, CUSTOM: { unit: 'job', label: 'Quoted price' },
+};
+const TO_FT: Record<string, number> = { ft: 1, in: 1 / 12, cm: 1 / 30.48, mm: 1 / 304.8, m: 3.28084 };
+
+function MeasureModal({ item, onClose, onAdd }: { item: Sellable; onClose: () => void; onAdd: (m: { quantity: number; description: string }) => void }) {
+  const mode = item.pricingMode ?? 'PER_UNIT';
+  const m = MEASURE[mode] ?? MEASURE.PER_UNIT;
+  const [unit, setUnit] = useState('ft');
+  const [len, setLen] = useState<number | null>(null);
+  const [wid, setWid] = useState<number | null>(null);
+  const [val, setVal] = useState<number | null>(null);
+  const [price, setPrice] = useState<number | null>(item.pricingRate ?? null);
+  const [desc, setDesc] = useState('');
+  const area = mode === 'PER_SQFT' || mode === 'PER_SQM';
+  const run = mode === 'PER_RFT';
+  const toFt = (v: number) => v * TO_FT[unit];
+  let qty = 0; let text = '';
+  if (area && len && wid) {
+    const sqft = toFt(len) * toFt(wid);
+    qty = Math.round((mode === 'PER_SQM' ? sqft / 10.7639 : sqft) * 100) / 100;
+    text = `${len} ${unit} × ${wid} ${unit} = ${qty} ${m.unit}`;
+  } else if (run && len) { qty = Math.round(toFt(len) * 100) / 100; text = `${len} ${unit} = ${qty} ${m.unit}`; }
+  else if (mode === 'CUSTOM' && desc.trim()) { qty = 1; text = desc.trim(); }
+  else if (!area && !run && mode !== 'CUSTOM' && val) { qty = val; text = `${val} ${m.unit}`; }
+  const rate = mode === 'CUSTOM' ? price ?? 0 : item.pricingRate ?? 0;
+  return (
+    <Modal open onClose={onClose} title={item.displayName} width={460}
+      footer={<><button className="btn" onClick={onClose}>Cancel</button><button className="btn btn-primary" disabled={qty <= 0 || (mode === 'CUSTOM' && !price)} onClick={() => onAdd({ quantity: qty, description: `${item.displayName} (${text})` })}>Add to bill</button></>}>
+      <div className="stack gap-4">
+        <p className="text-sm soft">{mode === 'CUSTOM' ? 'Priced per job.' : `Priced at ${money(item.pricingRate ?? 0)} per ${m.unit}.`} {m.label}.</p>
+        {(area || run) && <Segmented value={unit} onChange={setUnit} label="Unit" options={['ft', 'in', 'cm', 'mm', 'm'].map(u => ({ value: u, label: u }))} />}
+        {(area || run) && <div className="grid grid-2">
+          <NumberInput label={run ? `Length (${unit})` : `Length (${unit})`} value={len} min={0} step={0.01} onChange={setLen} autoFocus />
+          {area && <NumberInput label={`Width (${unit})`} value={wid} min={0} step={0.01} onChange={setWid} />}
+        </div>}
+        {!area && !run && mode !== 'CUSTOM' && <NumberInput label={m.label} value={val} min={0} step={0.01} onChange={setVal} autoFocus />}
+        {mode === 'CUSTOM' && <><TextInput label="Size / description" value={desc} onChange={e => setDesc(e.target.value)} placeholder="e.g. 7 ft × 2.5 ft with bevel" autoFocus /><NumberInput label="Price" money value={price} onChange={setPrice} /></>}
+        {qty > 0 && <div className="pay-position"><div className="row-line"><span>{text}</span><span /></div><div className="row-line remaining"><span>Amount</span><span>{money(qty * rate)}</span></div></div>}
+      </div>
+    </Modal>
   );
 }

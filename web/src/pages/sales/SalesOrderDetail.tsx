@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ban, CheckCircle2, IndianRupee, Lock, Pencil, Receipt, Truck } from 'lucide-react';
+import { Ban, CheckCircle2, IndianRupee, Lock, Pencil, Receipt, Truck, Workflow } from 'lucide-react';
 import { api, errorMessage } from '@/lib/api';
 import { addDays, date, dateTime, iso, label, money } from '@/lib/format';
 import { P } from '@/lib/perms';
@@ -73,6 +73,7 @@ export default function SalesOrderDetail() {
         title={<span className="doc-no" style={{ fontSize: 'inherit' }}>{o.number}</span>} badge={<Status value={o.status} />}
         desc={<>{o.customerName} · ordered {date(o.date)}{o.expectedDeliveryDate ? ` · delivery by ${date(o.expectedDeliveryDate)}` : ''}</>}
         actions={<>
+          <Link className="btn btn-ghost" to={`/360/SALES_ORDER/${id}`} title="Everything linked to this document"><Workflow aria-hidden />360°</Link>
           {o.status === 'DRAFT' && can(P.SalesOrderManage) && <button className="btn btn-primary" onClick={() => act.mutate({ kind: 'confirm' })} aria-busy={act.isPending}><CheckCircle2 aria-hidden />Confirm & reserve stock</button>}
           {open && o.status !== 'DRAFT' && !o.invoiceId && can(P.InvoiceCreate) && <button className="btn btn-primary" onClick={() => setInvoice(true)}><Receipt aria-hidden />Generate invoice</button>}
           {open && can(P.PaymentReceive) && balance > 0 && !o.invoiceId && <button className="btn" onClick={() => setPay(true)}><IndianRupee aria-hidden />Receive advance</button>}

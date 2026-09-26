@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Ban, Factory, FileText, IndianRupee, MessageCircle, Pencil, Receipt, Truck } from 'lucide-react';
+import { ArrowRight, Ban, Factory, FileText, IndianRupee, MessageCircle, Pencil, Receipt, Truck, Workflow } from 'lucide-react';
 import { api, errorMessage } from '@/lib/api';
 import { date, dateTime, daysFromToday, money } from '@/lib/format';
 import { P } from '@/lib/perms';
@@ -63,7 +63,9 @@ export default function CustomOrderDetail() {
         title={<span>{o.productType} <span className="doc-no muted" style={{ fontSize: 16 }}>{o.number}</span></span>}
         badge={<Status value={o.status} text={CUSTOM_ORDER_LABELS[o.status]} />}
         desc={<><Link to={`/customers/${o.customerId}`}>{o.customerName}</Link> · ordered {date(o.orderDate)} · {o.expectedCompletionDate ? <span className={days !== null && days < 0 && !cancelled && o.status !== 'COMPLETED' ? 't-bad' : ''}>due {date(o.expectedCompletionDate)}{days !== null && days < 0 && !cancelled && o.status !== 'COMPLETED' ? ` (${-days} day${days === -1 ? "" : "s"} late)` : ''}</span> : 'no due date'}</>}
-        actions={!cancelled && <>
+        actions={<>
+          <Link className="btn btn-ghost" to={`/360/CUSTOM_ORDER/${id}`} title="Everything linked to this order"><Workflow aria-hidden />360°</Link>
+          {!cancelled && <>
           {next && can(P.CustomOrderManage) && <button className="btn btn-primary" onClick={() => setNote({ open: true, text: '' })}><ArrowRight aria-hidden />Move to {CUSTOM_ORDER_LABELS[next]}</button>}
           {o.status === 'READY' && !o.invoiceId && can(P.InvoiceCreate) && <button className="btn btn-primary" onClick={() => setInvoice(true)}><Receipt aria-hidden />Generate invoice</button>}
           {o.status === 'READY' && o.invoiceId && can(P.DeliveryManage) && data.deliveries.length === 0 && <button className="btn btn-primary" onClick={() => delivery.mutate()} aria-busy={delivery.isPending}><Truck aria-hidden />Create delivery</button>}
@@ -74,6 +76,7 @@ export default function CustomOrderDetail() {
             { separator: true, label: '', hidden: !!o.invoiceId || !can(P.CustomOrderManage) },
             { label: 'Cancel order', icon: <Ban />, danger: true, onClick: cancel, hidden: !!o.invoiceId || !can(P.CustomOrderManage) },
           ]} />
+        </>}
         </>} />
 
       {cancelled ? <Notice tone="bad">Cancelled — {o.cancelReason}</Notice> : (

@@ -43,7 +43,7 @@ public sealed class AuditService(Db db, UserSession session)
         await LogAsync(conn, null, action, module, summary, recordType, recordId, recordRef, oldValue, newValue);
     }
 
-    public async Task<PagedResult<AuditLog>> ListAsync(ListQuery q, string? module = null, long? userId = null)
+    public async Task<PagedResult<AuditLog>> ListAsync(ListQuery q, string? module = null, long? userId = null, string? action = null)
     {
         session.Demand(Perm.AuditView);
         var where = """
@@ -51,9 +51,10 @@ public sealed class AuditService(Db db, UserSession session)
               and (@To::date is null or occurred_at < @To::date + 1)
               and (@Module::text is null or module = @Module)
               and (@UserId::bigint is null or user_id = @UserId)
+              and (@Action::text is null or action = @Action)
               and (@Search::text is null or summary ilike '%' || @Search || '%' or record_ref ilike '%' || @Search || '%')
             """;
-        var args = new { q.From, q.To, Module = module, UserId = userId, Search = Blank(q.Search), q.PageSize, q.Offset };
+        var args = new { q.From, q.To, Module = module, UserId = userId, Action = string.IsNullOrWhiteSpace(action) ? null : action, Search = Blank(q.Search), q.PageSize, q.Offset };
         await using var conn = await db.OpenAsync();
         var total = await conn.ExecuteScalarAsync<int>($"select count(*) from audit_logs {where}", args);
         var items = await conn.QueryAsync<AuditLog>($"""

@@ -5,11 +5,16 @@ import { ImagePlus, Plus, Trash2, X } from 'lucide-react';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { money } from '@/lib/format';
 import { P } from '@/lib/perms';
-import type { Product, Variant } from '@/lib/types';
+import type { PricingMode, Product, Variant } from '@/lib/types';
 import { useCan, useLookups, useMe, useToast } from '@/app/providers';
 import { Notice, PageHeader, SkeletonRows } from '@/components/ui/display';
 import { NumberInput, Select, Switch, TextArea, TextInput } from '@/components/ui/form';
 
+const PRICING_MODES: { value: PricingMode; label: string }[] = [
+  { value: 'FIXED', label: 'Per piece (fixed price)' }, { value: 'PER_SQFT', label: 'Per square foot' }, { value: 'PER_SQM', label: 'Per square metre' },
+  { value: 'PER_RFT', label: 'Per running foot' }, { value: 'PER_KG', label: 'Per kg' }, { value: 'PER_UNIT', label: 'Per unit (quantity)' }, { value: 'CUSTOM', label: 'Custom price each time' },
+];
+const PRICING_UNIT: Record<string, string> = { PER_SQFT: 'sq.ft', PER_SQM: 'sq.m', PER_RFT: 'running ft', PER_KG: 'kg', PER_UNIT: 'unit' };
 const blankVariant = (sku = ''): Variant => ({ id: 0, productId: 0, variantName: '', sku, isDefault: false, isActive: true, onHand: 0, reserved: 0, damaged: 0, available: 0, openingStock: 0 });
 const blank = (): Product => ({
   id: 0, code: '', name: '', categoryId: 0, brandId: null, warrantyMonths: 12, gstRate: 18, priceIncludesGst: true, costPrice: null, sellingPrice: 0,
@@ -28,11 +33,18 @@ export default function ProductEditor() {
   const { data: lookups } = useLookups();
   const [p, setP] = useState<Product>(blank);
   const [openingStock, setOpeningStock] = useState<number | null>(0);
+  const [pricingMode, setPricingMode] = useState<PricingMode>('FIXED');
+  const [pricingRate, setPricingRate] = useState<number | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const existing = useQuery({ queryKey: ['product', Number(id)], queryFn: () => api.get<Product>(`/api/products/${id}`), enabled: editing });
-  useEffect(() => { if (existing.data) setP(existing.data); }, [existing.data]);
+  useEffect(() => {
+    if (!existing.data) return;
+    setP(existing.data);
+    const v0 = existing.data.variants[0];
+    if (v0) { setPricingMode(v0.pricingMode ?? 'FIXED'); setPricingRate(v0.pricingRate ?? null); }
+  }, [existing.data]);
   useEffect(() => { if (!editing && lookups) setP(x => ({ ...x, gstRate: lookups.defaults.defaultGstRate, priceIncludesGst: lookups.defaults.defaultPriceIncludesGst })); }, [editing, lookups]);
   const set = <K extends keyof Product>(k: K, v: Product[K]) => setP(x => ({ ...x, [k]: v }));
   const hasVariants = p.variants.length > 1 || (p.variants.length === 1 && p.variants[0].variantName && p.variants[0].variantName !== 'Standard');
@@ -63,7 +75,8 @@ export default function ProductEditor() {
       if (Object.keys(e).length) throw new ApiError(400, 'Please correct the highlighted fields.');
       let variants = p.variants;
       if (!editing && variants.length === 0) variants = [{ ...blankVariant(p.code), variantName: 'Standard', isDefault: true, openingStock: openingStock ?? 0 }];
-      const body = { ...p, variants: variants.map((v, i) => ({ ...v, sku: v.sku || `${p.code}-${i + 1}`, variantName: v.variantName || 'Standard' })) };
+      if (pricingMode !== 'FIXED' && pricingMode !== 'CUSTOM' && !pricingRate) throw new ApiError(400, 'Enter the rate for measured pricing.', undefined, { pricingRate: 'Required' });
+      const body = { ...p, variants: variants.map((v, i) => ({ ...v, sku: v.sku || `${p.code}-${i + 1}`, variantName: v.variantName || 'Standard', pricingMode, pricingRate: pricingMode === 'FIXED' ? null : pricingRate })) };
       return editing ? api.put<Product>(`/api/products/${id}`, body) : api.post<Product>('/api/products', body);
     },
     onSuccess: r => { toast.success(editing ? 'Product saved' : 'Product added', r.name); qc.invalidateQueries({ queryKey: ['products'] }); qc.invalidateQueries({ queryKey: ['product', r.id] }); qc.invalidateQueries({ queryKey: ['lookups'] }); nav(`/products/${r.id}`); },
@@ -118,8 +131,9 @@ export default function ProductEditor() {
               <TextInput label="Colour" optional value={p.color ?? ''} onChange={e => set('color', e.target.value)} />
               <TextInput label="Size" optional value={p.size ?? ''} onChange={e => set('size', e.target.value)} placeholder="King" />
               <TextInput label="Dimensions" optional value={p.dimensions ?? ''} onChange={e => set('dimensions', e.target.value)} placeholder="84 × 36 × 34 in" />
-              <NumberInput label="Warranty (months)" value={p.warrantyMonths} min={0} onChange={v => set('warrantyMonths', v ?? 0)} />
+              <NumberInput label="Warranty (months)" value={p.warrantyMonths} min={0} onChange={v => set('warrantyMonths', v ?? 0)} hint={p.warrantyMonths ? 'Registered automatically on every sale' : undefined} />
             </div>
+            {p.warrantyMonths > 0 && <TextInput label="Warranty terms" optional value={p.warrantyTerms ?? ''} onChange={e => set('warrantyTerms', e.target.value)} placeholder="Manufacturing defects in frame and hydraulics; excludes fabric wear and water damage" />}
           </div>
         </section>
 
@@ -131,6 +145,10 @@ export default function ProductEditor() {
               {me.canSeeCost && <NumberInput label="Cost price" optional money value={p.costPrice ?? null} onChange={v => set('costPrice', v)} hint={p.costPrice && p.sellingPrice ? `Margin ${money(p.sellingPrice - p.costPrice, { decimals: false })}` : 'Visible to owners only'} />}
               <NumberInput label="Max discount %" value={p.discountPercent} min={0} max={100} onChange={v => set('discountPercent', v ?? 0)} hint="Staff can give up to this" />
               <Select label="GST rate" value={p.gstRate} onChange={e => set('gstRate', Number(e.target.value))} options={(lookups?.gstRates ?? []).map(r => ({ value: r.rate, label: `${r.rate}%` }))} />
+            </div>
+            <div className="grid grid-4">
+              <Select label="Priced" value={pricingMode} onChange={e => setPricingMode(e.target.value as PricingMode)} options={PRICING_MODES} hint={pricingMode === 'FIXED' ? 'One price per piece' : 'Billed by measurement at the counter'} />
+              {pricingMode !== 'FIXED' && pricingMode !== 'CUSTOM' && <NumberInput label={`Rate per ${PRICING_UNIT[pricingMode]}`} required money value={pricingRate} onChange={setPricingRate} hint="Staff may discount up to the max discount" />}
             </div>
             <div className="grid grid-2">
               <Select label="HSN code" value={p.hsnCode ?? ''} onChange={e => set('hsnCode', e.target.value)} error={errors.hsnCode} placeholder="Choose…"

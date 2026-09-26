@@ -1,18 +1,18 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Copy, History, LayoutGrid, List, Package, PackagePlus, Pencil, Receipt, Rows3, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { Copy, History, LayoutGrid, List, Package, PackagePlus, Pencil, Receipt, Rows3, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react';
 import { api, errorMessage } from '@/lib/api';
 import { money } from '@/lib/format';
 import { useStored } from '@/lib/hooks';
 import { usePagedList } from '@/lib/useList';
 import { P } from '@/lib/perms';
 import type { Brand, Category, ProductRow } from '@/lib/types';
-import { useCan, useToast } from '@/app/providers';
+import { useCan, useLookups, useToast } from '@/app/providers';
 import { DataTable, type Column } from '@/components/DataTable';
 import { EmptyState, Money, PageHeader, Segmented, Status, StockLevel } from '@/components/ui/display';
-import { SearchInput } from '@/components/ui/form';
-import { useConfirm, type MenuAction, Menu } from '@/components/ui/overlay';
+import { NumberInput, SearchInput, Select } from '@/components/ui/form';
+import { useConfirm, type MenuAction, Menu, Modal } from '@/components/ui/overlay';
 import { AdjustStockModal, StockDrawer } from '@/components/Stock';
 
 interface Facets { categories: Category[]; brands: Brand[]; materials: string[]; gstRates: number[] }
@@ -29,6 +29,7 @@ export default function Products() {
   const { state, update } = list;
   const facets = useQuery({ queryKey: ['product-facets'], queryFn: () => api.get<Facets>('/api/products/facets'), staleTime: 300_000 });
   const [history, setHistory] = useState<number | null>(null);
+  const [bulk, setBulk] = useState<{ ids: number[]; clear: () => void } | null>(null);
   const [adjust, setAdjust] = useState<ProductRow | null>(null);
   const f = state.filters;
   const activeFilters = FILTERS.filter(k => f[k]);
@@ -100,7 +101,10 @@ export default function Products() {
   return (
     <div className="page">
       <PageHeader title="Products" desc="Your catalogue with live stock. Prices shown are selling prices; variants (size, colour, finish) keep their own SKU and stock."
-        actions={can(P.ProductManage) && <Link className="btn btn-primary" to="/products/new"><PackagePlus aria-hidden />Add product</Link>} />
+        actions={<>
+          {can(P.ProductImport) && <Link className="btn" to="/products/import"><Upload aria-hidden />Import</Link>}
+          {can(P.ProductManage) && <Link className="btn btn-primary" to="/products/new"><PackagePlus aria-hidden />Add product</Link>}
+        </>} />
       {view === 'grid' ? (
         <div className="table-card">
           <div className="table-toolbar">{toolbar}</div>
@@ -121,6 +125,7 @@ export default function Products() {
       ) : (
         <DataTable id="products" label="Products" columns={columns} rowKey={r => r.id} {...list.tableProps} compact={view === 'compact'}
           onRowClick={r => nav(`/products/${r.id}`)} rowActions={actions}
+          selectable={can(P.ProductManage)} bulkActions={(sel, clear) => <button className="btn btn-sm btn-primary" onClick={() => setBulk({ ids: sel.map(r => r.id), clear })}>Change {sel.length} product{sel.length > 1 ? 's' : ''}…</button>}
           rowClass={r => (r.status !== 'ACTIVE' ? 'muted-row' : undefined)}
           toolbar={toolbar}
           empty={state.search || activeFilters.length
@@ -129,6 +134,7 @@ export default function Products() {
           exportAs={{ title: 'Products', fetchAll: list.fetchAll }} />
       )}
       <StockDrawer variantId={history} onClose={() => setHistory(null)} />
+      {bulk && <BulkModal ids={bulk.ids} onClose={() => setBulk(null)} onDone={() => { bulk.clear(); setBulk(null); }} />}
       {adjust && adjust.defaultVariantId && <AdjustStockModal open onClose={() => setAdjust(null)} item={{ variantId: adjust.defaultVariantId, displayName: adjust.name, available: adjust.available, reserved: adjust.reserved, onHand: adjust.onHand, damaged: 0 }} />}
     </div>
   );
@@ -169,5 +175,47 @@ function GridPager({ list }: { list: ReturnType<typeof usePagedList<ProductRow>>
         <button className="btn btn-sm" disabled={t.page >= pages} onClick={() => t.onPage(t.page + 1)}>Next</button>
       </div>
     </nav>
+  );
+}
+
+const BULK_ACTIONS = [
+  { value: 'PRICE_PERCENT', label: 'Change selling price by %', hint: 'e.g. 5 for +5%, −10 for a 10% cut. Rounded to the rupee.', kind: 'number' },
+  { value: 'PRICE_SET', label: 'Set selling price', hint: 'Same price for all selected products.', kind: 'money' },
+  { value: 'DISCOUNT', label: 'Set max discount %', hint: 'Staff can discount up to this.', kind: 'number' },
+  { value: 'GST', label: 'Set GST rate', hint: '', kind: 'gst' },
+  { value: 'HSN', label: 'Set HSN code', hint: '', kind: 'hsn' },
+  { value: 'CATEGORY', label: 'Move to category', hint: '', kind: 'category' },
+  { value: 'MIN_STOCK', label: 'Set minimum stock', hint: 'Low-stock alert level.', kind: 'number' },
+  { value: 'STATUS', label: 'Set status', hint: 'Inactive / discontinued products are hidden from billing.', kind: 'status' },
+];
+
+function BulkModal({ ids, onClose, onDone }: { ids: number[]; onClose: () => void; onDone: () => void }) {
+  const toast = useToast();
+  const qc = useQueryClient();
+  const { data: lookups } = useLookups();
+  const [action, setAction] = useState('PRICE_PERCENT');
+  const [value, setValue] = useState<number | null>(null);
+  const [text, setText] = useState('');
+  const a = BULK_ACTIONS.find(x => x.value === action)!;
+  const go = useMutation({
+    mutationFn: () => api.post<{ updated: number }>('/api/products/bulk', { productIds: ids, action, value, text: text || null }),
+    onSuccess: r => { toast.success(`${r.updated} product${r.updated === 1 ? '' : 's'} updated`); ['products', 'sellable', 'inventory'].forEach(k => qc.invalidateQueries({ queryKey: [k] })); onDone(); },
+    onError: e => toast.error('Not updated', errorMessage(e)),
+  });
+  const ready = a.kind === 'status' || a.kind === 'hsn' ? !!text : value !== null;
+  return (
+    <Modal open onClose={onClose} title={`Change ${ids.length} product${ids.length > 1 ? 's' : ''}`} width={480}
+      footer={<><button className="btn" onClick={onClose}>Cancel</button><button className="btn btn-primary" disabled={!ready} onClick={() => go.mutate()} aria-busy={go.isPending}>Apply to {ids.length}</button></>}>
+      <div className="stack gap-4">
+        <Select label="Change" value={action} onChange={e => { setAction(e.target.value); setValue(null); setText(''); }} options={BULK_ACTIONS.map(x => ({ value: x.value, label: x.label }))} hint={a.hint || undefined} />
+        {a.kind === 'number' && <NumberInput label="Value" value={value} min={action === 'PRICE_PERCENT' ? -90 : 0} onChange={setValue} autoFocus />}
+        {a.kind === 'money' && <NumberInput label="Price" money value={value} onChange={setValue} autoFocus />}
+        {a.kind === 'gst' && <Select label="GST rate" value={value ?? ''} onChange={e => setValue(Number(e.target.value))} options={[{ value: '', label: 'Choose…' }, ...(lookups?.gstRates ?? []).map(r => ({ value: r.rate, label: `${r.rate}%` }))]} />}
+        {a.kind === 'category' && <Select label="Category" value={value ?? ''} onChange={e => setValue(Number(e.target.value))} options={[{ value: '', label: 'Choose…' }, ...(lookups?.categories ?? []).map(c => ({ value: c.id, label: c.name }))]} />}
+        {a.kind === 'hsn' && <Select label="HSN" value={text} onChange={e => setText(e.target.value)} options={[{ value: '', label: 'Choose…' }, ...(lookups?.hsnCodes ?? []).map(h => ({ value: h.code, label: `${h.code} — ${h.description}` }))]} />}
+        {a.kind === 'status' && <Select label="Status" value={text} onChange={e => setText(e.target.value)} options={[{ value: '', label: 'Choose…' }, { value: 'ACTIVE', label: 'Active' }, { value: 'INACTIVE', label: 'Inactive' }, { value: 'DISCONTINUED', label: 'Discontinued' }]} />}
+        <p className="text-xs muted">The change is recorded in the activity log with the list of products.</p>
+      </div>
+    </Modal>
   );
 }

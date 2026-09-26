@@ -47,6 +47,8 @@ public sealed class SalesDocumentInput
     public long? QuotationId { get; set; }
     public long? SalesOrderId { get; set; }
     public long? CustomOrderId { get; set; }
+    /// <summary>Staff member credited with the sale (commission). Null = carried from the source document, else the user saving it.</summary>
+    public long? SalespersonId { get; set; }
 }
 
 public sealed class PaymentLineInput

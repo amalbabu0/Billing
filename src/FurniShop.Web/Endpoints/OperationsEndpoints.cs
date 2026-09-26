@@ -12,10 +12,10 @@ public static partial class Api
 {
     public sealed record NoteRequest(string? Note);
     public sealed record PaymentsRequest(List<PaymentLineInput>? Payments);
-    public sealed record ScheduleDeliveryRequest(DateTime Date, string? TimeSlot, string? DriverName, long? DriverUserId, string? VehicleNo, decimal? DeliveryCost);
+    public sealed record ScheduleDeliveryRequest(DateTime Date, string? TimeSlot, string? DriverName, long? DriverUserId, string? VehicleNo, decimal? DeliveryCost, string? Priority = null, string? Route = null, int? RouteOrder = null);
     public sealed record CompleteDeliveryRequest(string ReceiverName, string? Otp, string? SignatureDataUrl, string? PhotoDataUrl, string? PhotoFileName, string? Remarks);
     public sealed record ScheduleInstallationRequest(DateTime Date, string? TechnicianName, long? TechnicianUserId, decimal? Cost);
-    public sealed record CompleteInstallationRequest(string? Notes);
+    public sealed record CompleteInstallationRequest(string? Notes, string? PhotoDataUrl = null, string? PhotoFileName = null, string? ConfirmedBy = null);
 
     private static byte[]? FromDataUrl(string? dataUrl)
     {
@@ -74,7 +74,7 @@ public static partial class Api
         });
         api.MapPost("/deliveries/from-invoice/{invoiceId:long}", async (long invoiceId, AppServices app) => new { id = await app.Deliveries.CreateForInvoiceAsync(invoiceId) });
         api.MapPost("/deliveries/{id:long}/schedule", async (long id, ScheduleDeliveryRequest r, AppServices app) =>
-            new { otp = await app.Deliveries.ScheduleAsync(id, r.Date, r.TimeSlot, r.DriverName, r.DriverUserId, r.VehicleNo, r.DeliveryCost) });
+            new { otp = await app.Deliveries.ScheduleAsync(id, r.Date, r.TimeSlot, r.DriverName, r.DriverUserId, r.VehicleNo, r.DeliveryCost, r.Priority, r.Route, r.RouteOrder) });
         api.MapPost("/deliveries/{id:long}/dispatch", async (long id, AppServices app) => { await app.Deliveries.DispatchAsync(id); return Results.NoContent(); });
         api.MapPost("/deliveries/{id:long}/complete", async (long id, CompleteDeliveryRequest r, AppServices app) =>
         {
@@ -102,7 +102,7 @@ public static partial class Api
             await app.Installations.ScheduleAsync(id, r.Date, r.TechnicianName, r.TechnicianUserId, r.Cost);
             return Results.NoContent();
         });
-        api.MapPost("/installations/{id:long}/complete", async (long id, CompleteInstallationRequest r, AppServices app) => { await app.Installations.CompleteAsync(id, r.Notes); return Results.NoContent(); });
+        api.MapPost("/installations/{id:long}/complete", async (long id, CompleteInstallationRequest r, AppServices app) => { await app.Installations.CompleteAsync(id, r.Notes, null, FromDataUrl(r.PhotoDataUrl), r.PhotoFileName, r.ConfirmedBy); return Results.NoContent(); });
         api.MapPost("/installations/{id:long}/cancel", async (long id, ReasonRequest r, AppServices app) => { await app.Installations.CancelAsync(id, r.Reason); return Results.NoContent(); });
 
         // ---------------- expenses

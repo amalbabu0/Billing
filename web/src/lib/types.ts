@@ -20,7 +20,10 @@ export interface PaymentMethod { code: string; name: string; isActive: boolean; 
 export interface State { code: string; name: string }
 export interface ExpenseCategory { id: number; name: string; isActive: boolean }
 
+export type PricingMode = 'FIXED' | 'PER_UNIT' | 'PER_SQFT' | 'PER_RFT' | 'PER_SQM' | 'PER_KG' | 'CUSTOM';
+export interface CustomerGroup { code: string; name: string; discountPercent: number }
 export interface Lookups {
+  customerGroups?: CustomerGroup[];
   states: State[];
   categories: Category[];
   brands: Brand[];
@@ -47,6 +50,7 @@ export interface Variant {
   id: number; productId: number; variantName: string; sku: string; barcode?: string; size?: string; color?: string; material?: string; fabric?: string;
   finish?: string; configuration?: string; design?: string; dimensions?: string; costPrice?: number | null; sellingPrice?: number | null; minStock?: number | null;
   imageAttachmentId?: number; isDefault: boolean; isActive: boolean; onHand: number; reserved: number; damaged: number; available: number; openingStock: number;
+  pricingMode?: PricingMode; pricingRate?: number | null;
 }
 
 export interface Product {
@@ -54,13 +58,14 @@ export interface Product {
   size?: string; dimensions?: string; weightKg?: number | null; finish?: string; fabric?: string; warrantyMonths: number; hsnCode?: string; gstRate: number;
   priceIncludesGst: boolean; costPrice?: number | null; sellingPrice: number; discountPercent: number; minStock: number; description?: string; status: string;
   isStockItem: boolean; imageAttachmentId?: number | null; createdAt?: string; updatedAt?: string; onHand: number; reserved: number; available: number; variants: Variant[];
+  warrantyTerms?: string;
 }
 
 export interface Sellable {
   variantId: number; productId: number; productName: string; variantName: string; sku: string; barcode?: string; categoryName?: string; categoryId: number;
   hsnCode?: string; gstRate: number; priceIncludesGst: boolean; sellingPrice: number; costPrice?: number | null; discountPercent: number; onHand: number;
   reserved: number; available: number; isStockItem: boolean; material?: string; color?: string; dimensions?: string; imageAttachmentId?: number;
-  displayName: string; stockState: string;
+  displayName: string; stockState: string; pricingMode?: PricingMode; pricingRate?: number | null;
 }
 
 export interface InventoryRow {
@@ -78,7 +83,7 @@ export interface Movement {
 export interface Customer {
   id: number; code: string; name: string; mobile?: string; whatsapp?: string; email?: string; billingAddress?: string; city?: string; state?: string; stateCode?: string;
   pincode?: string; gstin?: string; notes?: string; isWalkIn: boolean; creditLimit: number; createdAt?: string; totalPurchases: number; outstanding: number;
-  lastPurchaseDate?: string; display?: string;
+  lastPurchaseDate?: string; display?: string; customerGroup?: string; customerGroupName?: string; groupDiscount?: number;
 }
 
 export interface CustomerSummary {
@@ -174,11 +179,13 @@ export interface Delivery {
   timeSlot?: string; driverName?: string; driverUserId?: number; vehicleNo?: string; deliveryCharge: number; deliveryCost?: number | null; status: string;
   otpVerified: boolean; hasOtp: boolean; receiverName?: string; signatureAttachmentId?: number; photoAttachmentId?: number; remarks?: string; notes?: string;
   deliveredAt?: string; createdAt: string; itemsSummary?: string; items: { id: number; description: string; quantity: number }[]; sourceNumber: string;
+  priority?: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT'; route?: string; routeOrder?: number;
 }
 export interface Installation {
   id: number; number: string; customerId: number; customerName?: string; customerMobile?: string; deliveryId?: number; deliveryNumber?: string; invoiceId?: number;
   invoiceNumber?: string; salesOrderId?: number; customOrderId?: number; customOrderNumber?: string; address: string; technicianName?: string; technicianUserId?: number;
   scheduledDate?: string; completedAt?: string; status: string; installationCost?: number | null; notes?: string; completionNotes?: string; createdAt: string;
+  completionPhotoId?: number; customerConfirmedBy?: string;
 }
 export interface Expense {
   id: number; number: string; categoryId: number; categoryName?: string; expenseDate: string; amount: number; methodCode: string; description?: string; reference?: string;
@@ -187,7 +194,7 @@ export interface Expense {
 
 export interface User {
   id: number; username: string; fullName: string; mobile?: string; email?: string; roleId: number; roleName?: string; roleCode?: string; mustChangePassword: boolean;
-  isActive: boolean; failedLoginCount: number; lockedUntil?: string; lastLoginAt?: string; createdAt: string;
+  isActive: boolean; failedLoginCount: number; lockedUntil?: string; lastLoginAt?: string; createdAt: string; commissionPercent?: number;
 }
 export interface Role { id: number; code: string; name: string; description?: string; isSystem: boolean; userCount: number }
 export interface PermissionInfo { code: string; module: string; description: string }

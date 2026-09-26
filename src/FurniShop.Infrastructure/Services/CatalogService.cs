@@ -179,10 +179,10 @@ public sealed class CatalogService(Db db, UserSession session, AuditService audi
                 p.Id = await conn.ExecuteScalarAsync<long>("""
                     insert into products (code, name, category_id, brand_id, material, color, size, dimensions, weight_kg, finish, fabric,
                         warranty_months, hsn_code, gst_rate, price_includes_gst, cost_price, selling_price, discount_percent, min_stock,
-                        description, status, is_stock_item, image_attachment_id, created_by)
+                        description, status, is_stock_item, image_attachment_id, created_by, warranty_terms)
                     values (@Code, @Name, @CategoryId, @BrandId, @Material, @Color, @Size, @Dimensions, @WeightKg, @Finish, @Fabric,
                         @WarrantyMonths, @HsnCode, @GstRate, @PriceIncludesGst, @CostPrice, @SellingPrice, @DiscountPercent, @MinStock,
-                        @Description, @Status, @IsStockItem, @ImageAttachmentId, @uid) returning id
+                        @Description, @Status, @IsStockItem, @ImageAttachmentId, @uid, @WarrantyTerms) returning id
                     """, new DynamicParameters(p).With("uid", session.UserId), tx);
             }
             else
@@ -192,7 +192,7 @@ public sealed class CatalogService(Db db, UserSession session, AuditService audi
                         size=@Size, dimensions=@Dimensions, weight_kg=@WeightKg, finish=@Finish, fabric=@Fabric, warranty_months=@WarrantyMonths,
                         hsn_code=@HsnCode, gst_rate=@GstRate, price_includes_gst=@PriceIncludesGst, cost_price=@CostPrice,
                         selling_price=@SellingPrice, discount_percent=@DiscountPercent, min_stock=@MinStock, description=@Description,
-                        status=@Status, is_stock_item=@IsStockItem, image_attachment_id=@ImageAttachmentId, updated_at=now()
+                        status=@Status, is_stock_item=@IsStockItem, image_attachment_id=@ImageAttachmentId, warranty_terms=@WarrantyTerms, updated_at=now()
                     where id=@Id
                     """, p, tx);
             }
@@ -228,9 +228,9 @@ public sealed class CatalogService(Db db, UserSession session, AuditService audi
                     if (!canCost) v.CostPrice = null;
                     v.Id = await conn.ExecuteScalarAsync<long>("""
                         insert into product_variants (product_id, variant_name, sku, barcode, size, color, material, fabric, finish, configuration,
-                            design, dimensions, cost_price, selling_price, min_stock, image_attachment_id, is_default, is_active)
+                            design, dimensions, cost_price, selling_price, min_stock, image_attachment_id, is_default, is_active, pricing_mode, pricing_rate)
                         values (@ProductId, @VariantName, @Sku, @Barcode, @Size, @Color, @Material, @Fabric, @Finish, @Configuration,
-                            @Design, @Dimensions, @CostPrice, @SellingPrice, @MinStock, @ImageAttachmentId, @IsDefault, @IsActive) returning id
+                            @Design, @Dimensions, @CostPrice, @SellingPrice, @MinStock, @ImageAttachmentId, @IsDefault, @IsActive, @PricingMode, @PricingRate) returning id
                         """, v, tx);
                     await conn.ExecuteAsync("insert into inventory (variant_id) values (@Id) on conflict do nothing", v, tx);
                     if (v.OpeningStock > 0 && p.IsStockItem)
@@ -248,7 +248,8 @@ public sealed class CatalogService(Db db, UserSession session, AuditService audi
                         update product_variants set variant_name=@VariantName, sku=@Sku, barcode=@Barcode, size=@Size, color=@Color,
                             material=@Material, fabric=@Fabric, finish=@Finish, configuration=@Configuration, design=@Design,
                             dimensions=@Dimensions, cost_price=@CostPrice, selling_price=@SellingPrice, min_stock=@MinStock,
-                            image_attachment_id=@ImageAttachmentId, is_default=@IsDefault, is_active=@IsActive, updated_at=now()
+                            image_attachment_id=@ImageAttachmentId, is_default=@IsDefault, is_active=@IsActive, pricing_mode=@PricingMode,
+                            pricing_rate=@PricingRate, updated_at=now()
                         where id=@Id and product_id=@ProductId
                         """, v, tx);
                     if (n == 0) throw new NotFoundException("Variant", v.Id);
@@ -329,7 +330,8 @@ public sealed class CatalogService(Db db, UserSession session, AuditService audi
                p.discount_percent, coalesce(i.on_hand,0) as on_hand, coalesce(i.reserved,0) as reserved,
                coalesce(i.on_hand,0) - coalesce(i.reserved,0) as available, p.is_stock_item,
                coalesce(v.material, p.material) as material, coalesce(v.color, p.color) as color,
-               coalesce(v.dimensions, p.dimensions) as dimensions, coalesce(v.image_attachment_id, p.image_attachment_id) as image_attachment_id
+               coalesce(v.dimensions, p.dimensions) as dimensions, coalesce(v.image_attachment_id, p.image_attachment_id) as image_attachment_id,
+               v.pricing_mode, v.pricing_rate
         from product_variants v
         join products p on p.id = v.product_id
         join categories c on c.id = p.category_id

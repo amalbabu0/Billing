@@ -4,7 +4,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Bell, Boxes, ChevronRight, CircleUser, FileText, Hammer, KeyRound, LayoutDashboard, LogOut, Menu as MenuIcon, Package, PanelLeftClose, PanelLeftOpen,
-  Plus, Receipt, Search, ShoppingBag, Sofa, Truck, Users,
+  Factory, Plus, Receipt, Search, ShieldCheck, ShoppingBag, Sofa, Target, Truck, Users, Wrench,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useDebounced, useHotkey, useStored } from '@/lib/hooks';
@@ -185,9 +185,9 @@ function Notifications() {
     api.post(`/api/notifications/${n.id}/read`).catch(() => {});
     qc.setQueryData<Notification[]>(['notifications'], x => (x ?? []).filter(i => i.id !== n.id));
     setOpen(false);
-    if (n.refType === 'INVOICE' && n.refId) nav(`/sales/invoices/${n.refId}`);
-    else if (n.refType === 'CUSTOM_ORDER' && n.refId) nav(`/custom-orders/${n.refId}`);
-    else if (n.refType === 'VARIANT') nav('/inventory/low');
+    const to = n.refType ? NOTIFICATION_ROUTES[n.refType]?.(n.refId) : undefined;
+    if (to) nav(to);
+    else if (n.kind === 'FOLLOW_UP') nav('/crm/follow-ups');
     else if (n.kind === 'BACKUP') nav('/settings/backup');
   };
   const r = btn.current?.getBoundingClientRect();
@@ -221,8 +221,25 @@ function Notifications() {
   );
 }
 
+/** Where a notification about each kind of record opens. */
+const NOTIFICATION_ROUTES: Record<string, (id?: number | null) => string | undefined> = {
+  INVOICE: id => id ? `/sales/invoices/${id}` : undefined,
+  QUOTATION: id => id ? `/sales/quotations/${id}` : undefined,
+  SALES_ORDER: id => id ? `/sales/orders/${id}` : undefined,
+  CUSTOM_ORDER: id => id ? `/custom-orders/${id}` : undefined,
+  CUSTOMER: id => id ? `/customers/${id}` : undefined,
+  VARIANT: () => '/inventory/low',
+  WARRANTY: id => id ? `/service/warranties?open=${id}` : '/service/warranties',
+  SERVICE: id => id ? `/service/tickets?open=${id}` : '/service/tickets',
+  LEAD: id => id ? `/crm/leads?open=${id}` : '/crm/leads',
+  PRODUCTION_ORDER: id => id ? `/production/orders?open=${id}` : '/production',
+  RAW_MATERIAL: () => '/production/materials?low=true',
+  CASH_SESSION: () => '/cash',
+};
+
 // ------------------------------------------------------------ global search
-const KIND_ICON: Record<string, typeof Search> = { Product: Package, Customer: CircleUser, Invoice: Receipt, Quotation: FileText, 'Sales order': FileText, Supplier: ShoppingBag, Purchase: ShoppingBag, 'Custom order': Hammer, Delivery: Truck };
+const KIND_ICON: Record<string, typeof Search> = { Product: Package, Customer: CircleUser, Invoice: Receipt, Quotation: FileText, 'Sales order': FileText, Supplier: ShoppingBag, Purchase: ShoppingBag, 'Custom order': Hammer, Delivery: Truck,
+  'Service ticket': Wrench, Warranty: ShieldCheck, Lead: Target, 'Production order': Factory, 'Raw material': Boxes };
 
 function routeFor(r: SearchResult): string {
   switch (r.kind) {
@@ -235,6 +252,11 @@ function routeFor(r: SearchResult): string {
     case 'Purchase': return `/purchases/${r.id}`;
     case 'Custom order': return `/custom-orders/${r.id}`;
     case 'Delivery': return `/delivery/all?open=${r.id}`;
+    case 'Service ticket': return `/service/tickets?open=${r.id}`;
+    case 'Warranty': return `/service/warranties?open=${r.id}`;
+    case 'Lead': return `/crm/leads?open=${r.id}`;
+    case 'Production order': return `/production/orders?open=${r.id}`;
+    case 'Raw material': return `/production/materials?q=${encodeURIComponent(r.title)}`;
     default: return '/';
   }
 }

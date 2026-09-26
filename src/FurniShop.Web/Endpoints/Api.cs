@@ -168,6 +168,7 @@ public static partial class Api
     public sealed record ExportRequest(string Title, string? Subtitle, string Format, List<ExportColumn> Columns, List<Dictionary<string, System.Text.Json.JsonElement>> Rows,
         List<ExportTotal>? Totals);
     public sealed record ExportTotal(string Label, string Value);
+    public sealed class CustomerGroupRow { public string Code { get; set; } = ""; public string Name { get; set; } = ""; public decimal DiscountPercent { get; set; } }
 
     private static void MapCommon(RouteGroupBuilder api)
     {
@@ -184,8 +185,9 @@ public static partial class Api
                 gstRates = await app.Settings.GstRatesAsync(true),
                 hsnCodes = await app.Settings.HsnCodesAsync(),
                 paymentMethods = await app.Settings.PaymentMethodsAsync(true),
+                customerGroups = await app.Db.QueryAsync<CustomerGroupRow>("select code, name, discount_percent from customer_groups where is_active order by discount_percent, name"),
                 expenseCategories = session.HasAny(Perm.ExpenseView, Perm.ExpenseManage) ? await app.Expenses.CategoriesAsync() : Array.Empty<ExpenseCategory>(),
-                staff = session.HasAny(Perm.DeliveryManage, Perm.InstallationManage)
+                staff = session.HasAny(Perm.DeliveryManage, Perm.InstallationManage, Perm.ServiceManage, Perm.LeadManage, Perm.ProductionManage, Perm.InvoiceCreate)
                     ? (await app.Users.ActiveStaffAsync()).Select(u => new { u.Id, u.FullName, u.RoleCode, u.Mobile })
                     : Enumerable.Empty<object>(),
                 defaults = new

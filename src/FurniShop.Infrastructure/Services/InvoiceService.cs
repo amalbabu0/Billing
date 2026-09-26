@@ -71,6 +71,7 @@ public sealed class InvoiceService(Db db, UserSession session, AuditService audi
             id = input.Id;
         }
         await SalesDocumentBuilder.InsertLinesAsync(conn, tx, "invoice_items", "invoice_id", id, built.Lines, "source_sales_order_item_id");
+        await SalesDocumentBuilder.SetSalespersonAsync(conn, tx, "invoices", id, input, session.UserId);
         return id;
     }
 
@@ -281,7 +282,7 @@ public sealed class InvoiceService(Db db, UserSession session, AuditService audi
 
     // ------------------------------------------------------------------ queries
     private const string HeaderSelect = """
-        select i.*, i.invoice_date as date, u.full_name as created_by_name, cu.full_name as cancelled_by_name,
+        select i.*, i.invoice_date as date, u.full_name as created_by_name, (select full_name from users sp where sp.id = i.salesperson_id) as salesperson_name, cu.full_name as cancelled_by_name,
                so.number as sales_order_number, q.number as quotation_number, co.number as custom_order_number,
                coalesce(b.returned_amount,0) as returned_amount, coalesce(b.paid,0) as paid
         from invoices i

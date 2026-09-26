@@ -34,7 +34,7 @@ public sealed class CustomerService(Db db, UserSession session, AuditService aud
         await using var conn = await db.OpenAsync();
         var total = await conn.ExecuteScalarAsync<int>($"select count(*) from customers c {join} {where}", args);
         var rows = await conn.QueryAsync<Customer>($"""
-            select c.*, coalesce(b.total,0) as total_purchases, coalesce(b.outstanding,0) as outstanding, b.last_date as last_purchase_date
+            select c.*, coalesce(b.total,0) as total_purchases, coalesce(b.outstanding,0) as outstanding, b.last_date as last_purchase_date, (select name from customer_groups g where g.code = c.customer_group) as customer_group_name, (select discount_percent from customer_groups g where g.code = c.customer_group) as group_discount
             from customers c {join} {where} order by c.is_walk_in desc, {order} {dir}, c.id limit @PageSize offset @Offset
             """, args);
         return new PagedResult<Customer> { Items = rows.AsList(), TotalCount = total, Page = q.Page, PageSize = q.PageSize };
@@ -45,7 +45,7 @@ public sealed class CustomerService(Db db, UserSession session, AuditService aud
     {
         session.DemandAny(Perm.CustomerView, Perm.InvoiceCreate);
         return await db.QueryAsync<Customer>("""
-            select * from customers where not is_deleted
+            select customers.*, (select name from customer_groups g where g.code = customers.customer_group) as customer_group_name, (select discount_percent from customer_groups g where g.code = customers.customer_group) as group_discount from customers where not is_deleted
               and (@t::text is null or name ilike '%' || @t || '%' or mobile like '%' || @t || '%' or code ilike @t)
             order by is_walk_in desc, name limit @limit
             """, new { t = Blank(text), limit });
@@ -55,7 +55,7 @@ public sealed class CustomerService(Db db, UserSession session, AuditService aud
     {
         session.DemandAny(Perm.CustomerView, Perm.InvoiceCreate, Perm.DeliveryView);
         await using var conn = await db.OpenAsync();
-        var c = await conn.QuerySingleOrDefaultAsync<Customer>("select * from customers where id = @id", new { id })
+        var c = await conn.QuerySingleOrDefaultAsync<Customer>($"select customers.*, (select name from customer_groups g where g.code = customers.customer_group) as customer_group_name, (select discount_percent from customer_groups g where g.code = customers.customer_group) as group_discount from customers where id = @id", new { id })
                 ?? throw new NotFoundException("Customer", id);
         c.Addresses = (await conn.QueryAsync<CustomerAddress>("select * from customer_addresses where customer_id = @id order by is_default desc, id", new { id })).AsList();
         return c;
@@ -100,9 +100,9 @@ public sealed class CustomerService(Db db, UserSession session, AuditService aud
             {
                 c.Code = await SequenceService.NextAsync(conn, tx, DocType.Customer);
                 c.Id = await conn.ExecuteScalarAsync<long>("""
-                    insert into customers (code, name, mobile, whatsapp, email, billing_address, city, state, state_code, pincode, gstin, notes, credit_limit, created_by)
-                    values (@Code, @Name, @Mobile, @Whatsapp, @Email, @BillingAddress, @City, @State, @StateCode, @Pincode, @Gstin, @Notes, @CreditLimit, @CreatedBy) returning id
-                    """, new { c.Code, c.Name, c.Mobile, c.Whatsapp, c.Email, c.BillingAddress, c.City, c.State, c.StateCode, c.Pincode, c.Gstin, c.Notes, c.CreditLimit, CreatedBy = session.UserId }, tx);
+                    insert into customers (code, name, mobile, whatsapp, email, billing_address, city, state, state_code, pincode, gstin, notes, credit_limit, created_by, customer_group)
+                    values (@Code, @Name, @Mobile, @Whatsapp, @Email, @BillingAddress, @City, @State, @StateCode, @Pincode, @Gstin, @Notes, @CreditLimit, @CreatedBy, coalesce(@CustomerGroup, 'RETAIL')) returning id
+                    """, new { c.Code, c.Name, c.Mobile, c.Whatsapp, c.Email, c.BillingAddress, c.City, c.State, c.StateCode, c.Pincode, c.Gstin, c.Notes, c.CreditLimit, CreatedBy = session.UserId, c.CustomerGroup }, tx);
             }
             else
             {
@@ -111,7 +111,8 @@ public sealed class CustomerService(Db db, UserSession session, AuditService aud
                 if (old.IsWalkIn) { c.IsWalkIn = true; }
                 await conn.ExecuteAsync("""
                     update customers set name=@Name, mobile=@Mobile, whatsapp=@Whatsapp, email=@Email, billing_address=@BillingAddress, city=@City,
-                        state=@State, state_code=@StateCode, pincode=@Pincode, gstin=@Gstin, notes=@Notes, credit_limit=@CreditLimit, updated_at=now()
+                        state=@State, state_code=@StateCode, pincode=@Pincode, gstin=@Gstin, notes=@Notes, credit_limit=@CreditLimit,
+                        customer_group=coalesce(@CustomerGroup, customer_group), updated_at=now()
                     where id=@Id
                     """, c, tx);
             }

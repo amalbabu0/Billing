@@ -126,9 +126,12 @@ public sealed class DeliveryService(Db db, UserSession session, AuditService aud
     }
 
     /// <summary>Schedules (or reschedules) the delivery and issues a fresh OTP. Returns the OTP to share with the customer.</summary>
-    public async Task<string> ScheduleAsync(long id, DateTime date, string? timeSlot, string? driverName, long? driverUserId, string? vehicleNo, decimal? deliveryCost)
+    public async Task<string> ScheduleAsync(long id, DateTime date, string? timeSlot, string? driverName, long? driverUserId, string? vehicleNo, decimal? deliveryCost,
+        string? priority = null, string? route = null, int? routeOrder = null)
     {
         session.Demand(Perm.DeliveryManage);
+        if (priority is not (null or "LOW" or "NORMAL" or "HIGH" or "URGENT")) throw new ValidationException("Priority", "Unknown priority.");
+        if (routeOrder is < 1 or > 99) throw new ValidationException("RouteOrder", "Stop number must be 1–99.");
         if (date.Date < DateTime.Today) throw new ValidationException("ScheduledDate", "The delivery date cannot be in the past.");
         if (deliveryCost is < 0) throw new ValidationException("DeliveryCost", "Cost cannot be negative.");
         return await db.InTransactionAsync(async (conn, tx) =>
@@ -138,9 +141,11 @@ public sealed class DeliveryService(Db db, UserSession session, AuditService aud
             var otp = RandomNumberGenerator.GetInt32(1000, 10000).ToString();
             await conn.ExecuteAsync("""
                 update deliveries set scheduled_date = @date, time_slot = @timeSlot, driver_name = @driverName, driver_user_id = @driverUserId,
-                    vehicle_no = @vehicleNo, delivery_cost = coalesce(@deliveryCost, delivery_cost), status = 'SCHEDULED', otp_hash = @hash, otp_verified = false, updated_at = now()
+                    vehicle_no = @vehicleNo, delivery_cost = coalesce(@deliveryCost, delivery_cost), status = 'SCHEDULED', otp_hash = @hash, otp_verified = false,
+                    priority = coalesce(@priority, priority), route = @route, route_order = @routeOrder, updated_at = now()
                 where id = @id
-                """, new { date = date.Date, timeSlot, driverName, driverUserId, vehicleNo, deliveryCost, hash = PasswordHasher.HashOtp(otp, id), id }, tx);
+                """, new { date = date.Date, timeSlot, driverName, driverUserId, vehicleNo, deliveryCost, hash = PasswordHasher.HashOtp(otp, id), id,
+                    priority, route = string.IsNullOrWhiteSpace(route) ? null : route.Trim(), routeOrder }, tx);
             await SalesDocumentBuilder.AddStatusHistoryAsync(conn, tx, DocType.Delivery, id, d.Status, DeliveryStatus.Scheduled,
                 $"{date:dd-MMM-yyyy} {timeSlot} — {driverName} {vehicleNo}", session.UserId);
             await audit.LogAsync(conn, tx, "SCHEDULE", "Delivery", $"scheduled delivery {d.Number} on {date:dd-MMM-yyyy}", "delivery", id, d.Number);
@@ -306,7 +311,8 @@ public sealed class DeliveryService(Db db, UserSession session, AuditService aud
             select count(*) from deliveries d join customers c on c.id = d.customer_id left join invoices i on i.id = d.invoice_id
             left join sales_orders so on so.id = d.sales_order_id {where}
             """, args);
-        var order = q.Status == DeliveryStatus.Delivered ? "d.delivered_at desc" : "d.scheduled_date nulls first, d.created_at";
+        var order = q.Status == DeliveryStatus.Delivered ? "d.delivered_at desc"
+            : "case d.priority when 'URGENT' then 0 when 'HIGH' then 1 else 2 end, d.scheduled_date nulls first, d.driver_name nulls last, d.route nulls last, d.route_order nulls last, d.created_at";
         var rows = await conn.QueryAsync<Delivery>($"{Select} {where} order by {order} limit @PageSize offset @Offset", args);
         return new PagedResult<Delivery> { Items = rows.AsList(), TotalCount = total, Page = q.Page, PageSize = q.PageSize };
     }
@@ -337,7 +343,7 @@ public sealed class DeliveryService(Db db, UserSession session, AuditService aud
 }
 
 /// <summary>Installations: Pending → Scheduled → Assigned → Completed.</summary>
-public sealed class InstallationService(Db db, UserSession session, AuditService audit)
+public sealed class InstallationService(Db db, UserSession session, AuditService audit, AttachmentService attachments)
 {
     internal static async Task<long> InsertAsync(NpgsqlConnection conn, NpgsqlTransaction tx, UserSession session, Installation i)
     {
@@ -388,7 +394,7 @@ public sealed class InstallationService(Db db, UserSession session, AuditService
         });
     }
 
-    public async Task CompleteAsync(long id, string? notes, DateTime? completedAt = null)
+    public async Task CompleteAsync(long id, string? notes, DateTime? completedAt = null, byte[]? photo = null, string? photoFileName = null, string? confirmedBy = null)
     {
         session.Demand(Perm.InstallationManage);
         await db.InTransactionAsync(async (conn, tx) =>
@@ -398,8 +404,11 @@ public sealed class InstallationService(Db db, UserSession session, AuditService
                 throw new BusinessRuleException("Schedule / assign the installation before completing it.");
             if (cur.DeliveryId.HasValue && await conn.ExecuteScalarAsync<string>("select status from deliveries where id = @DeliveryId", cur, tx) != DeliveryStatus.Delivered)
                 throw new BusinessRuleException("The goods have not been delivered yet.");
-            await conn.ExecuteAsync("update installations set status = 'COMPLETED', completed_at = @at, completion_notes = @notes, updated_at = now() where id = @id",
-                new { at = completedAt ?? DateTime.Now, notes, id }, tx);
+            long? photoId = photo is { Length: > 0 } ? await attachments.SaveAsync(conn, tx, photo, photoFileName ?? "installation.jpg", "INSTALLATION", id, "PHOTO") : null;
+            await conn.ExecuteAsync("""
+                update installations set status = 'COMPLETED', completed_at = @at, completion_notes = @notes, completion_photo_id = coalesce(@photoId, completion_photo_id),
+                    customer_confirmed_by = @confirmedBy, updated_at = now() where id = @id
+                """, new { at = completedAt ?? DateTime.Now, notes, photoId, confirmedBy = string.IsNullOrWhiteSpace(confirmedBy) ? null : confirmedBy.Trim(), id }, tx);
             await SalesDocumentBuilder.AddStatusHistoryAsync(conn, tx, DocType.Installation, id, cur.Status, InstallationStatus.Completed, notes, session.UserId);
 
             if (cur.SalesOrderId.HasValue)

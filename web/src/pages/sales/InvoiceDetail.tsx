@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeftRight, Ban, Download, IndianRupee, Receipt, RotateCcw, Truck, Undo2 } from 'lucide-react';
+import { ArrowLeftRight, Ban, Download, IndianRupee, Receipt, RotateCcw, Truck, Undo2, Workflow } from 'lucide-react';
 import { api, errorMessage, openPdf } from '@/lib/api';
 import { date, dateTime, label, money, pct, relative } from '@/lib/format';
 import { P } from '@/lib/perms';
@@ -72,6 +72,7 @@ export default function InvoiceDetail() {
         badge={<Status value={inv.paymentState} />}
         desc={<>{date(inv.date)} · billed by {inv.createdByName ?? '—'}{inv.finalizedAt ? ` · finalised ${relative(inv.finalizedAt)}` : ''}</>}
         actions={<>
+          <Link className="btn btn-ghost" to={`/360/INVOICE/${id}`} title="Everything linked to this document"><Workflow aria-hidden />360°</Link>
           {inv.status === 'DRAFT' && can(P.InvoiceCreate) && <Link className="btn btn-primary" to={`/pos/${inv.id}`}><Receipt aria-hidden />Continue billing</Link>}
           {final && inv.balance > 0 && can(P.PaymentReceive) && <button className="btn btn-primary" onClick={() => setPay(true)}><IndianRupee aria-hidden />Receive payment</button>}
           {final && <button className="btn" onClick={doc.print}>Print</button>}

@@ -7,7 +7,7 @@ import type { Role, User } from '@/lib/types';
 import { useMe, useToast } from '@/app/providers';
 import { DataTable, type Column } from '@/components/DataTable';
 import { Avatar, Badge, EmptyState, PageHeader, Segmented, Status } from '@/components/ui/display';
-import { SearchInput, Select, Switch, TextInput } from '@/components/ui/form';
+import { NumberInput, SearchInput, Select, Switch, TextInput } from '@/components/ui/form';
 import { Drawer, useConfirm } from '@/components/ui/overlay';
 
 export default function Users() {
@@ -97,6 +97,7 @@ function UserDrawer({ value, roles, onClose, onSaved }: { value: Partial<User> |
           <TextInput label="Mobile" optional inputMode="tel" value={u.mobile ?? ''} onChange={e => setU({ ...u, mobile: e.target.value })} error={errors.mobile} />
           <TextInput label="Email" optional type="email" value={u.email ?? ''} onChange={e => setU({ ...u, email: e.target.value })} error={errors.email} />
         </div>
+        <div className="grid grid-2"><NumberInput label="Sales commission %" optional value={u.commissionPercent ?? 0} min={0} max={100} onChange={v => setU({ ...u, commissionPercent: v ?? 0 })} error={errors.commissionPercent} hint="On net taxable sales credited to this person" /></div>
         <div className="card card-pad stack gap-3" style={{ background: 'var(--surface-sunken)' }}>
           <div className="row gap-2 medium"><Lock aria-hidden style={{ width: 16 }} />{creating ? 'Temporary password' : 'Reset password'}</div>
           <TextInput label={creating ? 'Password' : 'New password'} required={creating} optional={!creating} type="text" autoComplete="new-password" value={password} autoFocus={!!reset}

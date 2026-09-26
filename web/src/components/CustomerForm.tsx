@@ -72,6 +72,9 @@ function Fields({ c, set, errors, full }: { c: Partial<Customer>; set: (k: keyof
             <TextInput label="Email" optional type="email" value={c.email ?? ''} onChange={e => set('email', e.target.value)} error={errors.email} />
             <NumberInput label="Credit limit" optional money value={c.creditLimit ?? 0} onChange={v => set('creditLimit', v ?? 0)} hint="0 = no limit" />
           </div>
+          <Select label="Customer group" value={c.customerGroup ?? 'RETAIL'} onChange={e => set('customerGroup', e.target.value)}
+            options={(lookups?.customerGroups ?? [{ code: 'RETAIL', name: 'Retail', discountPercent: 0 }]).map(g => ({ value: g.code, label: g.discountPercent ? `${g.name} — up to ${g.discountPercent}% off` : g.name }))}
+            hint="Dealers, designers and contractors get their group discount at billing" />
           <TextArea label="Notes" optional rows={2} value={c.notes ?? ''} onChange={e => set('notes', e.target.value)} />
         </>
       )}

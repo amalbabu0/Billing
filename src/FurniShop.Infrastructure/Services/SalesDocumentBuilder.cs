@@ -30,6 +30,8 @@ internal static class SalesDocumentBuilder
         public decimal CostPrice { get; set; }
         public decimal DiscountPercent { get; set; }
         public bool IsDeleted { get; set; }
+        public string PricingMode { get; set; } = "FIXED";
+        public decimal? PricingRate { get; set; }
     }
 
     public static async Task<BuiltDocument> BuildAsync(NpgsqlConnection conn, NpgsqlTransaction tx, UserSession session,
@@ -45,11 +47,13 @@ internal static class SalesDocumentBuilder
         var interState = GstCalculator.IsInterState(settings.Shop.StateCode, pos);
 
         var validRates = (await conn.QueryAsync<decimal>("select rate from gst_rates", transaction: tx)).ToHashSet();
+        // Group pricing (dealer, designer, wholesale…): its discount is allowed on top of each product's standard discount limit.
+        var groupDiscount = await conn.ExecuteScalarAsync<decimal?>("select discount_percent from customer_groups where code = @CustomerGroup and is_active", customer, tx) ?? 0;
         var ids = input.Lines.Where(l => l.VariantId.HasValue).Select(l => l.VariantId!.Value).Distinct().ToArray();
         var variants = (await conn.QueryAsync<VariantInfo>("""
             select v.id, p.name as product_name, v.variant_name, v.sku, p.hsn_code, p.gst_rate, p.price_includes_gst,
                    coalesce(v.selling_price, p.selling_price) as selling_price, coalesce(v.cost_price, p.cost_price) as cost_price,
-                   p.discount_percent, (v.is_deleted or p.is_deleted) as is_deleted
+                   p.discount_percent, (v.is_deleted or p.is_deleted) as is_deleted, v.pricing_mode, v.pricing_rate
             from product_variants v join products p on p.id = v.product_id where v.id = any(@ids)
             """, new { ids }, tx)).ToDictionary(v => v.Id);
 
@@ -81,14 +85,15 @@ internal static class SalesDocumentBuilder
 
             if (v is not null && enforceDiscount && !session.Has(Perm.InvoiceDiscount))
             {
-                // Compare the net unit price with the list price less the product's standard discount.
-                var list = v.SellingPrice;
+                // Compare the net unit price with the list price (or measured rate) less the larger of product and customer-group discount.
+                var list = v.PricingMode != "FIXED" && v.PricingRate is { } rateList ? rateList : v.SellingPrice;
                 if (v.PriceIncludesGst != l.PriceIncludesGst)
                     list = v.PriceIncludesGst ? GstCalculator.ExcludeTax(list, v.GstRate) : Money.R2(list * (100 + v.GstRate) / 100m);
-                var minUnit = list * (1 - v.DiscountPercent / 100m);
+                var allowed = Math.Max(v.DiscountPercent, groupDiscount);
+                var minUnit = list * (1 - allowed / 100m);
                 var netUnit = (l.PriceIncludesGst ? result.Total : result.Taxable) / l.Quantity;
                 if (netUnit < minUnit - 0.01m)
-                    throw new PermissionDeniedException($"{Perm.InvoiceDiscount}: discount on {description} exceeds the allowed {v.DiscountPercent:0.##}% — ask a manager");
+                    throw new PermissionDeniedException($"{Perm.InvoiceDiscount}: discount on {description} exceeds the allowed {allowed:0.##}% — ask a manager");
             }
 
             inputs.Add(taxInput);
@@ -108,6 +113,18 @@ internal static class SalesDocumentBuilder
             new DocumentChargesInput(input.DeliveryCharge, input.InstallationCharge, chargesRate), settings.Invoice.RoundOff);
         return new BuiltDocument(lines, totals, interState, pos, customer);
     }
+
+    /// <summary>
+    /// Records who gets credit for the sale: the chosen salesperson, else the one on the source quotation / order, else the person saving it.
+    /// </summary>
+    public static Task SetSalespersonAsync(NpgsqlConnection conn, NpgsqlTransaction tx, string table, long id, SalesDocumentInput input, long? userId) =>
+        conn.ExecuteAsync($"""
+            update {table} set salesperson_id = coalesce(@SalespersonId,
+                (select salesperson_id from sales_orders where id = @SalesOrderId),
+                (select salesperson_id from quotations where id = @QuotationId),
+                salesperson_id, @userId)
+            where id = @id
+            """, new { input.SalespersonId, input.SalesOrderId, input.QuotationId, userId, id }, tx);
 
     /// <summary>Header parameters shared by the three document tables.</summary>
     public static object TotalsArgs(BuiltDocument b) => new

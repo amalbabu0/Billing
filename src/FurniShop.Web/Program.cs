@@ -16,6 +16,7 @@ if (string.IsNullOrWhiteSpace(cs))
 cs = ConnectionStringParser.Normalise(cs);
 
 builder.Services.AddSingleton(new Db(cs));
+builder.Services.AddHostedService<FurniShop.Web.Hosting.ReminderService>();
 builder.Services.AddFurniShopSecurity(builder.Configuration);
 builder.Services.ConfigureHttpJsonOptions(o =>
 {

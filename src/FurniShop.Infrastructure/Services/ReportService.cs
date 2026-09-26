@@ -66,6 +66,8 @@ public sealed class ReportService(Db db, UserSession session)
         new("profit.invoice", "Profit", "Invoice margin", Perm.ReportProfit, "Margin on every invoice", UsesCustomer: true, NeedsCost: true),
         new("profit.product", "Profit", "Product margin", Perm.ReportProfit, "Margin per product", UsesCategory: true, NeedsCost: true),
         new("expense.category", "Profit", "Expenses by category", Perm.ExpenseView, "Business expenses"),
+        new("sales.commission", "Sales", "Salesperson commission", Perm.ReportProfit, "Net sales (taxable, after returns) and commission per salesperson"),
+        new("inv.analytics", "Inventory", "Stock movement analysis", Perm.ReportInventory, "Fast, slow, dead and overstock items with a reorder suggestion", UsesCategory: true),
     };
 
     public IReadOnlyList<ReportDefinition> Available() =>
@@ -384,6 +386,57 @@ public sealed class ReportService(Db db, UserSession session)
                     """;
                 money.Add("Amount");
                 break;
+            case "sales.commission":
+                // Returns in the period are deducted at their taxable value, so commission is paid on what the shop keeps.
+                sql = """
+                    with sold as (
+                        select coalesce(i.salesperson_id, 0) as uid, count(*) as invoices, sum(i.taxable_total) as taxable
+                        from invoices i where i.status = 'FINAL' and i.invoice_date between @From and @To group by 1),
+                    returned as (
+                        select coalesce(i.salesperson_id, 0) as uid, sum(round(ri.quantity / it.quantity * it.taxable_amount, 2)) as taxable
+                        from sales_returns r join sales_return_items ri on ri.return_id = r.id join invoice_items it on it.id = ri.invoice_item_id
+                        join invoices i on i.id = r.invoice_id where r.return_date between @From and @To group by 1)
+                    select coalesce(u.full_name, '(not recorded)') as "Salesperson", coalesce(s.invoices, 0) as "Invoices",
+                           coalesce(s.taxable, 0) as "Sales (taxable)", coalesce(r.taxable, 0) as "Returns (taxable)",
+                           coalesce(s.taxable, 0) - coalesce(r.taxable, 0) as "Net sales", coalesce(u.commission_percent, 0) as "Commission %",
+                           round((coalesce(s.taxable, 0) - coalesce(r.taxable, 0)) * coalesce(u.commission_percent, 0) / 100, 2) as "Commission"
+                    from sold s full join returned r on r.uid = s.uid left join users u on u.id = coalesce(s.uid, r.uid)
+                    order by 5 desc
+                    """;
+                money.UnionWith(new[] { "Sales (taxable)", "Returns (taxable)", "Net sales", "Commission" });
+                break;
+            case "inv.analytics":
+            {
+                // Rate of sale over the chosen period drives the classification; the reorder suggestion covers 30 days of sales plus the minimum.
+                var valueCol = cost ? """, round(on_hand * cost_price, 2) as "Stock value" """ : "";
+                sql = $"""
+                    with sales as (
+                        select it.variant_id, sum(it.quantity) as qty
+                        from invoice_items it join invoices i on i.id = it.invoice_id and i.status = 'FINAL' and i.invoice_date between @From and @To
+                        where it.variant_id is not null group by 1),
+                    lastever as (
+                        select it.variant_id, max(i.invoice_date) as last_sale from invoice_items it join invoices i on i.id = it.invoice_id and i.status = 'FINAL' group by 1),
+                    base as (
+                        select v.variant_id, v.sku, v.product_name || case when v.variant_name <> 'Standard' then ' — ' || v.variant_name else '' end as item, v.category_name,
+                               v.available, v.on_hand, v.min_stock, v.cost_price, coalesce(s.qty, 0) as sold,
+                               coalesce(s.qty, 0) / greatest(1, (@To::date - @From::date + 1)) as per_day, le.last_sale
+                        from v_inventory v left join sales s on s.variant_id = v.variant_id left join lastever le on le.variant_id = v.variant_id
+                        where v.is_stock_item and v.product_status = 'ACTIVE' and (@CategoryId::bigint is null or v.category_id = @CategoryId)),
+                    ranked as (select b.*, percent_rank() over (order by sold desc) as pr from base b)
+                    select sku as "SKU", item as "Item", category_name as "Category", sold as "Sold in period", on_hand as "On hand",
+                           case when per_day > 0 then round(on_hand / per_day) end as "Days of cover",
+                           last_sale as "Last sold",
+                           case when sold = 0 and on_hand > 0 then 'Dead' when sold = 0 then 'No stock, no sales'
+                                when pr <= 0.2 then 'Fast'
+                                when on_hand / per_day > 180 then 'Overstock'
+                                when on_hand / per_day > 90 then 'Slow'
+                                else 'Normal' end as "Movement",
+                           greatest(0, ceil(per_day * 30 + min_stock - available)) as "Suggested reorder" {valueCol}
+                    from ranked order by case when sold = 0 and on_hand > 0 then 0 else 1 end, sold desc, item
+                    """;
+                money.Add("Stock value");
+                break;
+            }
             default:
                 throw new ArgumentException(key);
         }

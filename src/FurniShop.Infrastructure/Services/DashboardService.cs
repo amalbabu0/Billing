@@ -198,6 +198,33 @@ public sealed class SearchService(Db db, UserSession session)
                 (select 'Delivery', d.id, d.number, c.name, d.status from deliveries d join customers c on c.id = d.customer_id
                  where d.number ilike '%' || @t || '%' order by d.id desc limit @n)
                 """);
+        if (session.Has(Perm.ServiceView))
+            parts.Add("""
+                (select 'Service ticket', st.id, st.number, c.name || ' · ' || st.product_name || coalesce(' · ' || st.serial_no, ''), st.status
+                 from service_tickets st join customers c on c.id = st.customer_id
+                 where st.number ilike '%' || @t || '%' or st.serial_no ilike '%' || @t || '%' or c.mobile like '%' || @t || '%' order by st.id desc limit @n)
+                """);
+        if (session.HasAny(Perm.WarrantyView, Perm.ServiceView))
+            parts.Add("""
+                (select 'Warranty', w.id, w.number, c.name || ' · ' || w.product_name || coalesce(' · ' || w.serial_no, ''), case when w.is_void then 'VOID' when w.end_date < current_date then 'EXPIRED' else 'ACTIVE' end
+                 from warranties w join customers c on c.id = w.customer_id
+                 where w.number ilike '%' || @t || '%' or w.serial_no ilike '%' || @t || '%' order by w.id desc limit @n)
+                """);
+        if (session.Has(Perm.LeadView))
+            parts.Add("""
+                (select 'Lead', id, name, coalesce(mobile, '') || coalesce(' · ' || interested_products, ''), status from leads
+                 where name ilike '%' || @t || '%' or mobile like '%' || @t || '%' or number ilike @t order by id desc limit @n)
+                """);
+        if (session.Has(Perm.ProductionView))
+            parts.Add("""
+                (select 'Production order', id, number, description, status from production_orders
+                 where number ilike '%' || @t || '%' or description ilike '%' || @t || '%' order by id desc limit @n)
+                """);
+        if (session.HasAny(Perm.RawMaterialView, Perm.ProductionView))
+            parts.Add("""
+                (select 'Raw material', id, name, code || ' · ' || category, null from raw_materials
+                 where is_active and (name ilike '%' || @t || '%' or code ilike '%' || @t || '%') order by name limit @n)
+                """);
         if (parts.Count == 0) return Array.Empty<SearchResult>();
         return await db.QueryAsync<SearchResult>(string.Join(" union all ", parts), new { t, n = perKind });
     }
@@ -227,6 +254,38 @@ public sealed class NotificationService(Db db, UserSession session, SettingsServ
             select 'CUSTOM_DELAY', 'Custom order delayed', o.number || ' (' || o.product_type || ') was due ' || to_char(o.expected_completion_date, 'DD-Mon'), 'CUSTOM_ORDER', o.id
             from custom_orders o where o.status not in ('COMPLETED','CANCELLED') and o.expected_completion_date < current_date
               and not exists (select 1 from notifications n where n.ref_type = 'CUSTOM_ORDER' and n.ref_id = o.id and n.created_at::date = current_date);
+            """);
+
+        // Operations reminders (each at most once a day, or once per record where noted).
+        await db.ExecuteAsync("""
+            -- follow-ups due today or overdue, to the person responsible
+            insert into notifications (user_id, kind, title, message, ref_type, ref_id)
+            select f.assigned_to, 'FOLLOW_UP', 'Follow-up due', f.title || case when f.due_date < current_date then ' (overdue since ' || to_char(f.due_date, 'DD-Mon') || ')' else '' end, f.ref_type, f.ref_id
+            from follow_ups f
+            where f.done_at is null and f.due_date <= current_date and f.assigned_to is not null
+              and not exists (select 1 from notifications n where n.kind = 'FOLLOW_UP' and n.ref_type = f.ref_type and n.ref_id = f.ref_id and n.user_id = f.assigned_to and n.created_at::date = current_date);
+            -- warranties ending in the next 30 days (once per warranty)
+            insert into notifications (kind, title, message, ref_type, ref_id)
+            select 'WARRANTY_EXPIRING', 'Warranty ending soon', w.number || ' — ' || c.name || ', ' || w.product_name || ' ends ' || to_char(w.end_date, 'DD-Mon-YYYY'), 'WARRANTY', w.id
+            from warranties w join customers c on c.id = w.customer_id
+            where not w.is_void and w.end_date between current_date and current_date + 30
+              and not exists (select 1 from notifications n where n.kind = 'WARRANTY_EXPIRING' and n.ref_type = 'WARRANTY' and n.ref_id = w.id);
+            -- service visits scheduled today, to the technician
+            insert into notifications (user_id, kind, title, message, ref_type, ref_id)
+            select t.technician_user_id, 'SERVICE', 'Service visit today', t.number || ' — ' || c.name || ': ' || t.issue, 'SERVICE', t.id
+            from service_tickets t join customers c on c.id = t.customer_id
+            where t.technician_user_id is not null and t.visit_date = current_date and t.status not in ('COMPLETED','CANCELLED')
+              and not exists (select 1 from notifications n where n.kind = 'SERVICE' and n.ref_type = 'SERVICE' and n.ref_id = t.id and n.created_at::date = current_date);
+            -- raw materials at or below minimum (one summary a day)
+            insert into notifications (kind, title, message, ref_type)
+            select 'LOW_STOCK', 'Raw materials to reorder', count(*) || ' material(s) at or below minimum: ' || string_agg(name, ', ' order by name), 'RAW_MATERIAL'
+            from raw_materials where is_active and stock <= min_stock and min_stock > 0
+            having count(*) > 0 and not exists (select 1 from notifications n where n.kind = 'LOW_STOCK' and n.ref_type = 'RAW_MATERIAL' and n.ref_id is null and n.created_at::date = current_date);
+            -- yesterday's cash register left open
+            insert into notifications (kind, title, message, ref_type, ref_id)
+            select 'CASH', 'Cash register not closed', 'The register for ' || to_char(s.business_date, 'DD-Mon') || ' is still open. Count and close it.', 'CASH_SESSION', s.id
+            from cash_sessions s where s.status = 'OPEN' and s.business_date < current_date
+              and not exists (select 1 from notifications n where n.kind = 'CASH' and n.ref_type = 'CASH_SESSION' and n.ref_id = s.id and n.created_at::date = current_date);
             """);
 
         // Backup reminder for users who can take backups, at most once a day.

@@ -35,7 +35,7 @@ public sealed class AppServices : IAsyncDisposable
         CustomOrders = new CustomOrderService(Db, Session, Audit, Invoices, Payments);
         Purchases = new PurchaseService(Db, Session, Audit, Inventory);
         Deliveries = new DeliveryService(Db, Session, Audit, Attachments);
-        Installations = new InstallationService(Db, Session, Audit);
+        Installations = new InstallationService(Db, Session, Audit, Attachments);
         Expenses = new ExpenseService(Db, Session, Audit);
         Auth = new AuthService(Db, Session, Audit);
         Users = new UserService(Db, Session, Audit);
@@ -52,6 +52,9 @@ public sealed class AppServices : IAsyncDisposable
         ServiceDesk = new ServiceDeskService(Db, Session, Audit, Invoices);
         Crm = new CrmService(Db, Session, Audit, Customers);
         Cash = new CashRegisterService(Db, Session, Audit);
+        Lifecycle = new LifecycleService(Db, Session);
+        ProductImport = new ProductImportService(Db, Session, Audit, Catalog);
+        Analytics = new AnalyticsService(Db, Session);
         Documents = new DocumentService(this);
         Migrator = new Migrator(Db);
     }
@@ -61,6 +64,9 @@ public sealed class AppServices : IAsyncDisposable
     public ServiceDeskService ServiceDesk { get; }
     public CrmService Crm { get; }
     public CashRegisterService Cash { get; }
+    public LifecycleService Lifecycle { get; }
+    public ProductImportService ProductImport { get; }
+    public AnalyticsService Analytics { get; }
     public Db Db { get; }
     public UserSession Session { get; }
     public AuditService Audit { get; }

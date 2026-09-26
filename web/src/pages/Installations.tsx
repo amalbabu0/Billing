@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Ban, CalendarClock, CheckCircle2, Plus, Wrench } from 'lucide-react';
+import { Ban, Camera, CalendarClock, CheckCircle2, Image, Plus, Wrench } from 'lucide-react';
 import { api, errorMessage } from '@/lib/api';
 import { date, dateTime, iso, isoInput, label } from '@/lib/format';
 import { usePagedList } from '@/lib/useList';
@@ -46,7 +46,10 @@ export default function Installations() {
     { key: 'd', header: 'Date', mobile: 'meta', render: r => r.completedAt ? dateTime(r.completedAt) : r.scheduledDate ? date(r.scheduledDate) : <span className="muted">Not scheduled</span>, exportValue: r => date(r.completedAt ?? r.scheduledDate) },
     { key: 't', header: 'Technician', mobile: 'meta', render: r => r.technicianName ?? '—', exportValue: r => r.technicianName },
     ...(me.canSeeCost ? [{ key: 'cost', header: 'Cost', num: true, optional: true, render: (r: Installation) => <Money value={r.installationCost} />, exportValue: (r: Installation) => r.installationCost } as Column<Installation>] : []),
-    { key: 'notes', header: 'Notes', optional: true, render: r => <span className="text-sm soft">{r.completionNotes ?? r.notes}</span>, exportValue: r => r.completionNotes ?? r.notes },
+    { key: 'notes', header: 'Notes', render: r => <div className="cell-stack"><span className="text-sm soft">{r.completionNotes ?? r.notes}</span>
+      {(r.customerConfirmedBy || r.completionPhotoId) && <span className="cell-sub row gap-2">{r.customerConfirmedBy && <>Accepted by {r.customerConfirmedBy}</>}
+        {r.completionPhotoId && <a href={`/api/attachments/${r.completionPhotoId}`} target="_blank" rel="noreferrer" className="row gap-1" onClick={e => e.stopPropagation()}><Image aria-hidden style={{ width: 13 }} />Photo</a>}</span>}</div>,
+      exportValue: r => [r.completionNotes ?? r.notes, r.customerConfirmedBy && `Accepted by ${r.customerConfirmedBy}`].filter(Boolean).join(' · ') },
     { key: 's', header: 'Status', mobile: 'right', render: r => <Status value={r.status} />, exportValue: r => label(r.status) },
   ];
   return (
@@ -108,17 +111,31 @@ function ScheduleModal({ job, onClose, onDone }: { job: Installation; onClose: (
 function CompleteModal({ job, onClose, onDone }: { job: Installation; onClose: () => void; onDone: () => void }) {
   const toast = useToast();
   const [notes, setNotes] = useState('');
+  const [confirmedBy, setConfirmedBy] = useState(job.customerName ?? '');
+  const [photo, setPhoto] = useState<{ url: string; name: string } | null>(null);
   const go = useMutation({
-    mutationFn: () => api.post(`/api/installations/${job.id}/complete`, { notes: notes || null }),
+    mutationFn: () => api.post(`/api/installations/${job.id}/complete`, { notes: notes || null, confirmedBy: confirmedBy.trim() || null, photoDataUrl: photo?.url ?? null, photoFileName: photo?.name ?? null }),
     onSuccess: () => { toast.success('Installation completed'); onDone(); onClose(); },
     onError: e => toast.error('Not completed', errorMessage(e)),
   });
+  const pickPhoto = (file: File) => {
+    if (file.size > 8 * 1024 * 1024) { toast.error('Photo too large', 'Use a photo under 8 MB.'); return; }
+    const r = new FileReader();
+    r.onload = () => setPhoto({ url: String(r.result), name: file.name });
+    r.readAsDataURL(file);
+  };
   return (
-    <Modal open onClose={onClose} title={`Complete ${job.number}`} width={480}
+    <Modal open onClose={onClose} title={`Complete ${job.number}`} width={500}
       footer={<><button className="btn" onClick={onClose}>Cancel</button><button className="btn btn-primary" onClick={() => go.mutate()} aria-busy={go.isPending}>Mark completed</button></>}>
       <div className="stack gap-4">
         <p className="text-sm soft">{job.customerName} · {job.technicianName ?? 'No technician'} · {date(job.scheduledDate)}</p>
         <TextArea label="Completion notes" optional rows={3} autoFocus value={notes} onChange={e => setNotes(e.target.value)} placeholder="Fitted and levelled; customer checked all doors" />
+        <TextInput label="Checked and accepted by" optional value={confirmedBy} onChange={e => setConfirmedBy(e.target.value)} hint="Name of the person at site who confirmed the work" />
+        <div className="field">
+          <span className="field-label">Photo of the finished work<span className="opt">optional</span></span>
+          {photo ? <div className="row gap-3"><img src={photo.url} alt="Finished installation" style={{ width: 120, height: 90, objectFit: 'cover', borderRadius: 6 }} /><button className="btn btn-sm" onClick={() => setPhoto(null)}>Remove</button></div>
+            : <label className="dropzone row gap-2" style={{ justifyContent: 'center' }}><Camera aria-hidden /><span className="text-sm">Take or choose a photo</span><input type="file" accept="image/*" capture="environment" hidden onChange={e => e.target.files?.[0] && pickPhoto(e.target.files[0])} /></label>}
+        </div>
       </div>
     </Modal>
   );

@@ -10,6 +10,7 @@ Billing and shop management for Indian furniture retailers, available as a **bro
    * [Web app](#web-app-browser)
 2. [Setting up Neon](#setting-up-neon)
 3. [Features](#features)
+   * [Operations extension](#operations-extension-web-app)
 4. [Keyboard shortcuts](#keyboard-shortcuts)
 5. [Architecture](#architecture)
 6. [Business rules and data integrity](#business-rules-and-data-integrity)
@@ -109,6 +110,36 @@ Neon suspends idle compute; the first request after a pause can take a second or
 | **Settings** | Shop profile & logo, GST rates & HSN codes, invoice numbering (e.g. `INV-2026-0001`), terms, print formats, payment methods, printers (A4 / 80 mm / 58 mm thermal / labels), WhatsApp templates with live preview, security policy, backups. |
 | **Everywhere** | Global search (Ctrl+K) across products, customers, invoices and orders; notifications (low stock, overdue payments, deliveries today); print preview; A4 and thermal layouts; PDF; WhatsApp sharing; tables that switch to cards on narrow windows. |
 
+### Operations extension (web app)
+
+These features are part of the web app and its API. The Windows desktop app shares the same database and business rules but does not have screens for them.
+
+| Area | What it does |
+|---|---|
+| **Locations** | Showroom, godowns and workshop, each with its own stock. Purchases can be received into any location; sales take stock from the default location first. The total across all locations always equals the product's stock. |
+| **Stock transfers** | Draft → Dispatched → In transit → Received (or Cancelled), with vehicle and notes. Stock leaves the source location on dispatch and reaches the destination on receipt. |
+| **Raw materials** | Wood, board, foam, fabric, hardware, polish and so on, with unit, reorder level and weighted-average cost. Receipts, issues, returns and adjustments are stored as movements that can't be changed. |
+| **Bill of materials** | Materials needed for one unit of a product, with wastage %. Shows material cost against the selling price (only to roles that may see cost). |
+| **Production** | Work orders for stock items or custom orders: New → Planning → Material ready → Cutting → Assembly → Finishing → QC → Ready → Completed, on a drag-and-drop board. Material needs come from the BOM. Work can't move past planning until materials are issued. Completing an order adds finished stock, or sets the custom order's production cost and moves it to quality check. |
+| **Warranty** | Warranties are created automatically when an invoice for a named customer is finalised, using each product's warranty months and terms. Cancelling the invoice voids them. Warranties can also be registered by hand. Expiry reminders. |
+| **Service desk** | Repair and complaint tickets linked to the warranty, invoice and customer, with technician, visit date and parts. Work under warranty is free. Chargeable work is billed through a normal GST invoice (SAC 998719) when the ticket is completed. |
+| **Leads & follow-ups** | Enquiry pipeline (New → Contacted → Quotation → Negotiation → Confirmed → Converted, or Lost) by source, budget and interest. A lead can be converted to a customer. Follow-ups can be attached to leads, customers, quotations, orders or invoices, and due and overdue ones appear on the dashboard. |
+| **Cash register** | Open the day with a float, then see cash sales, receipts, refunds, expenses and expected cash. Closing with a counted amount that differs from the expected amount needs a note and a manager's approval. |
+| **Credit limit** | A sale that goes over the customer's limit is blocked. A user with *Override credit limit* can allow it after entering a reason, and the override is recorded on the invoice and in the activity log. |
+| **Customer groups** | Retail, Wholesale, Dealer, Contractor, Designer, Corporate and VIP, each with a default discount that POS applies automatically, still capped by the product's discount limit. |
+| **Measured pricing** | A variant can be priced per sq ft, per running ft or per cubic ft (for custom wardrobes, glass, foam). At the counter you enter dimensions and the price is calculated. |
+| **Commission** | Sales, quotations and orders record the salesperson. Each user can have a commission %, and the *Salesperson commission* report pays it on net taxable sales after returns. |
+| **Product import & bulk edit** | Import products from CSV or Excel using the template. Every row is checked and shown as new, update or error before anything is saved. Imports never change the stock of existing products. You can select products and change price (by % or to a set amount), GST, category, discount, minimum stock, HSN or status in one step. |
+| **Barcode labels & serial numbers** | Price-tag labels with barcode or QR code print from *Products → Barcode labels*. A serial number is recorded on the product's warranty, written back to the invoice line, and carried into service tickets and search. |
+| **Advanced delivery** | Priority (low to urgent), route or area, and stop number on the route, alongside date, slot, driver and vehicle. Proof of delivery is an OTP, a signature and a photo. Installations are closed with the name of the person who accepted the work and a photo. |
+| **Order 360°** | One page per sale showing lead → quotation → order → advance → production → invoice → payment → delivery → installation → warranty → service. It has a stage tracker, every linked document and a combined timeline, and opens from any quotation, order, invoice or custom order. |
+| **Analytics** | Compare any period with the previous one or the same period last year: sales, invoices, collections, margin (for roles that may see cost), conversion, returns, new customers, plus categories, products, salespeople and payment methods. The *Inventory analytics* report classifies products as fast, slow, dead or overstocked. |
+| **Reminders** | A background job runs every hour (`Reminders:Enabled`, `Reminders:IntervalMinutes` in `appsettings.json`) and creates notifications for overdue invoices, due follow-ups, expiring warranties, service visits, low raw materials, and a cash register left open. It creates at most one notification per record per day. |
+| **WhatsApp templates** | Editable templates for quotation, invoice, receipt, payment reminder, order confirmation, production ready, delivery scheduled, delivery completed, warranty reminder and service update. Messages open in WhatsApp with the text filled in. See *Known limitations*. |
+| **Search, audit & permissions** | Global search also covers service tickets, warranties, leads, production orders and raw materials. The activity log can be filtered by action, module, user and date. The 14 new permissions are checked on the server; hiding buttons in the app is only a convenience. |
+
+**Not included:** AI insights and forecasting need an external model API, and none is configured, so the app does not claim to have them. If the connection drops, POS keeps the bill being typed on that device and shows an offline banner. Nothing is saved or numbered until the connection returns, so there is no offline invoicing.
+
 ---
 
 ## Keyboard shortcuts
@@ -151,14 +182,16 @@ FurniShop.sln
 
 ### Database
 
-Migrations live in `src/FurniShop.Infrastructure/Database/Migrations` and are embedded in the assembly. They run under a PostgreSQL advisory lock, so two PCs starting at once are safe. Main tables: `products`, `product_variants`, `inventory`, `inventory_movements`, `customers`, `quotations`, `sales_orders`, `invoices` (+ `_items`), `payments`, `payment_lines`, `payment_allocations`, `sales_returns`, `exchanges`, `purchases`, `supplier_payments`, `custom_orders`, `deliveries`, `installations`, `expenses`, `users`, `roles`, `permissions`, `audit_logs`, `settings`, `document_sequences`, `attachments`.
+Migrations live in `src/FurniShop.Infrastructure/Database/Migrations` and are embedded in the assembly. They run under a PostgreSQL advisory lock, so two PCs starting at once are safe. Main tables: `products`, `product_variants`, `inventory`, `inventory_movements`, `customers`, `quotations`, `sales_orders`, `invoices` (+ `_items`), `payments`, `payment_lines`, `payment_allocations`, `sales_returns`, `exchanges`, `purchases`, `supplier_payments`, `custom_orders`, `deliveries`, `installations`, `expenses`, `users`, `roles`, `permissions`, `audit_logs`, `settings`, `document_sequences`, `attachments`; the operations extension (migrations 004–005) adds `warehouses`, `warehouse_stock`, `stock_transfers`, `raw_materials`, `raw_material_movements`, `boms`, `production_orders`, `warranties`, `service_tickets`, `leads`, `follow_ups`, `cash_sessions` and `customer_groups`.
 
 ---
 
 ## Business rules and data integrity
 
 * Credit (unpaid or part-paid) sales require a named customer, not *Walk-in*.
-* Credit limit is checked when set.
+* Credit limit is checked when set; going over it needs *Override credit limit* and a recorded reason.
+* Stock by location always adds up to total stock; transfers move stock only on dispatch and receipt.
+* Raw-material movements are append-only; production cannot start cutting until materials are issued.
 * Stock cannot go negative unless an admin turns that on; *available* stock excludes reserved quantities.
 * Document numbers (`INV-2026-0001`, `QTN-…`, `SO-…`, `RCPT-…`) are assigned inside the saving transaction with a row lock: unique and without gaps even with several counters. Draft invoices get a number only when finalised. Year-based series restart each year; the invoice series cannot be set backwards.
 * Finalised invoices cannot be edited; they can be **cancelled** with a reason (stock returns, any money received is kept as customer advance). Cancelled invoices remain visible.
@@ -203,6 +236,7 @@ The dashboard reminds the admin when the last backup is older than the configure
 dotnet run --project tools/FurniShop.Cli -- migrate      --db "<connection string>"
 dotnet run --project tools/FurniShop.Cli -- create-admin --db "..." --user admin --name "Owner" --password "..."
 dotnet run --project tools/FurniShop.Cli -- seed-demo    --db "..." --user admin --password "..."
+dotnet run --project tools/FurniShop.Cli -- seed-extras  --db "..." --user admin --password "..."   # demo data for the operations extension
 dotnet run --project tools/FurniShop.Cli -- sample-pdfs  --db "..." --user admin --password "..." --out ./samples
 ```
 
@@ -223,7 +257,7 @@ Workflow tests need a PostgreSQL server; each test class creates and drops its o
 export FURNISHOP_TEST_DB="Host=127.0.0.1;Port=5432;Username=postgres;Password=...;Database=postgres"
 ```
 
-Without a server they are skipped (unit tests still run). The 47 tests cover GST maths (intra/inter-state, inclusive/exclusive, rounding), validators, cash / credit / split-payment sales, quotation → order → invoice with advances, reservations, negative-stock rules, returns and refunds, exchanges, invoice cancellation, immutability of payments, concurrent invoice numbering, purchases and supplier ledger, custom order to installation, delivery proof, permissions and lockout, consistency between reports, PDFs and exports on the demo data set, GST listings / HSN / rate summaries / debit notes reconciling with invoices, and the web API pipeline (CSRF, sign-in, every GET endpoint, cost hiding for sales staff, forced password change, disabled users, rate limiting).
+Without a server they are skipped (unit tests still run). The 57 tests cover GST maths (intra/inter-state, inclusive/exclusive, rounding), validators, cash / credit / split-payment sales, quotation → order → invoice with advances, reservations, negative-stock rules, returns and refunds, exchanges, invoice cancellation, immutability of payments, concurrent invoice numbering, purchases and supplier ledger, custom order to installation, delivery proof, permissions and lockout, consistency between reports, PDFs and exports on the demo data set, GST listings / HSN / rate summaries / debit notes reconciling with invoices, locations and transfers, raw materials / BOM / production, warranties and chargeable service, leads and follow-ups, the cash register, credit-limit override, group and measured pricing, product import, Order 360°, and the web API pipeline (CSRF, sign-in, every GET endpoint, cost hiding for sales staff, forced password change, disabled users, rate limiting).
 
 The WPF project builds on any OS with the .NET 8 SDK (`EnableWindowsTargeting`), but only runs on Windows.
 

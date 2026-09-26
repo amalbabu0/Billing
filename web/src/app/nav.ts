@@ -38,6 +38,7 @@ export const NAV: NavGroup[] = [
       { label: 'Brands', to: '/products/brands', perms: [P.ProductView] },
       { label: 'Variants', to: '/products/variants', perms: [P.ProductView] },
       { label: 'Barcode / QR', to: '/products/barcodes', perms: [P.ProductView] },
+      { label: 'Import products', to: '/products/import', perms: [P.ProductImport] },
     ],
   },
   {
@@ -117,6 +118,7 @@ export const NAV: NavGroup[] = [
   { label: 'Expenses', icon: Wallet, to: '/expenses', perms: [P.ExpenseView] },
   {
     label: 'Reports', icon: BarChart3, children: [
+      { label: 'Analytics', to: '/analytics', perms: [P.ReportSales] },
       { label: 'Sales', to: '/reports/sales', perms: [P.ReportSales] },
       { label: 'Purchases', to: '/reports/purchases', perms: [P.ReportPurchase] },
       { label: 'Profit', to: '/reports/profit', perms: [P.ReportProfit] },

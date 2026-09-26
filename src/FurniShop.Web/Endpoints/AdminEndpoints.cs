@@ -166,7 +166,8 @@ public static partial class Api
         });
         api.MapDelete("/roles/{id:long}", async (long id, AppServices app) => { await app.Users.DeleteRoleAsync(id); UserDirectory.InvalidateAll(); return Results.NoContent(); });
 
-        api.MapGet("/audit", async (QueryOf<ListQuery> lq, string? module, long? userId, AppServices app) => await app.Audit.ListAsync(lq.Value.Clamp(), module, userId));
+        api.MapGet("/audit", async (QueryOf<ListQuery> lq, string? module, long? userId, string? action, AppServices app) => await app.Audit.ListAsync(lq.Value.Clamp(), module, userId, action));
+        api.MapGet("/audit/actions", async (AppServices app) => { app.Session.Demand(FurniShop.Core.Security.Perm.AuditView); return await app.Db.QueryAsync<string>("select distinct action from audit_logs order by 1"); });
         api.MapGet("/audit/record/{type}/{id:long}", async (string type, long id, AppServices app) =>
         {
             app.Session.Demand(Perm.AuditView);

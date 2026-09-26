@@ -35,6 +35,8 @@ public sealed class User
     public DateTime? LockedUntil { get; set; }
     public DateTime? LastLoginAt { get; set; }
     public DateTime CreatedAt { get; set; }
+    /// <summary>Sales commission as a percentage of the taxable value of invoices credited to this user.</summary>
+    public decimal CommissionPercent { get; set; }
 }
 
 public sealed class Category
@@ -115,6 +117,7 @@ public sealed class Product
     public string? Finish { get; set; }
     public string? Fabric { get; set; }
     public int WarrantyMonths { get; set; }
+    public string? WarrantyTerms { get; set; }
     public string? HsnCode { get; set; }
     public decimal GstRate { get; set; } = 18;
     public bool PriceIncludesGst { get; set; } = true;
@@ -159,6 +162,9 @@ public sealed class ProductVariant
     public long? ImageAttachmentId { get; set; }
     public bool IsDefault { get; set; }
     public bool IsActive { get; set; } = true;
+    /// <summary>FIXED (price per piece) or measured pricing: PER_UNIT, PER_SQFT, PER_RFT, PER_SQM, PER_KG, CUSTOM.</summary>
+    public string PricingMode { get; set; } = "FIXED";
+    public decimal? PricingRate { get; set; }
     // joined / computed
     public decimal OnHand { get; set; }
     public decimal Reserved { get; set; }
@@ -193,6 +199,8 @@ public sealed class SellableItem
     public string? Color { get; set; }
     public string? Dimensions { get; set; }
     public long? ImageAttachmentId { get; set; }
+    public string PricingMode { get; set; } = "FIXED";
+    public decimal? PricingRate { get; set; }
     public string DisplayName => string.IsNullOrWhiteSpace(VariantName) || VariantName == "Standard" ? ProductName : $"{ProductName} — {VariantName}";
     public string StockState => !IsStockItem ? "MADE_TO_ORDER" : Available <= 0 ? "OUT_OF_STOCK" : "IN_STOCK";
 }
@@ -261,6 +269,9 @@ public sealed class Customer
     public string? Notes { get; set; }
     public bool IsWalkIn { get; set; }
     public decimal CreditLimit { get; set; }
+    public string CustomerGroup { get; set; } = "RETAIL";
+    public string? CustomerGroupName { get; set; }
+    public decimal GroupDiscount { get; set; }
     public DateTime CreatedAt { get; set; }
     // list aggregates
     public decimal TotalPurchases { get; set; }
@@ -396,6 +407,8 @@ public class SalesDocument
     public string? Notes { get; set; }
     public string? Terms { get; set; }
     public long? CreatedBy { get; set; }
+    public long? SalespersonId { get; set; }
+    public string? SalespersonName { get; set; }
     public string? CreatedByName { get; set; }
     public DateTime CreatedAt { get; set; }
     public List<DocumentLine> Lines { get; set; } = new();
@@ -740,6 +753,9 @@ public sealed class Delivery
     public string? ItemsSummary { get; set; }
     public List<DeliveryItem> Items { get; set; } = new();
     public string SourceNumber => InvoiceNumber ?? SalesOrderNumber ?? CustomOrderNumber ?? "";
+    public string Priority { get; set; } = "NORMAL";
+    public string? Route { get; set; }
+    public int? RouteOrder { get; set; }
 }
 
 public sealed class DeliveryItem
@@ -774,6 +790,8 @@ public sealed class Installation
     public decimal? InstallationCost { get; set; }
     public string? Notes { get; set; }
     public string? CompletionNotes { get; set; }
+    public long? CompletionPhotoId { get; set; }
+    public string? CustomerConfirmedBy { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 

@@ -33,6 +33,26 @@ public sealed class DemoOperationsSeeder(AppServices app)
             }
         }
 
+        if (await app.Db.ScalarAsync<int>("select count(*) from deliveries where route is not null") == 0)
+        {
+            progress?.Report("Delivery routes…");
+            // Group open deliveries into areas by pincode so the board shows route planning.
+            await app.Db.ExecuteAsync("""
+                with d as (
+                    select id, deliveryaddress_pin, row_number() over (partition by deliveryaddress_pin order by scheduled_date nulls last, id) as stop
+                    from (select id, scheduled_date, coalesce(substring(delivery_address from '(\d{6})'), '') as deliveryaddress_pin from deliveries
+                          where status in ('SCHEDULED', 'OUT_FOR_DELIVERY', 'PENDING')) x)
+                update deliveries t set
+                    route = case when d.deliveryaddress_pin in ('560087', '560037', '560066') then 'East — Whitefield / KR Puram'
+                                 when d.deliveryaddress_pin in ('560003', '560010', '560055') then 'West — Rajajinagar / Malleshwaram'
+                                 when d.deliveryaddress_pin in ('560102', '560034', '560069', '560041') then 'South Bengaluru'
+                                 else 'Central' end,
+                    route_order = d.stop,
+                    priority = case when t.id % 7 = 0 then 'URGENT' when t.id % 4 = 0 then 'HIGH' else 'NORMAL' end
+                from d where t.id = d.id and t.scheduled_date is not null
+                """);
+        }
+
         if (await app.Db.ScalarAsync<int>("select count(*) from raw_materials") == 0)
         {
             progress?.Report("Raw materials, BOMs and production…");

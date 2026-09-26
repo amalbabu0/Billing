@@ -75,6 +75,33 @@ public static partial class Api
         api.MapPost("/follow-ups", async (FollowUpInput f, AppServices app) => new { id = await app.Crm.AddFollowUpAsync(f) });
         api.MapPost("/follow-ups/{id:long}/done", async (long id, FollowUpDoneRequest r, AppServices app) => { await app.Crm.CompleteFollowUpAsync(id, r.Outcome, r.NextDate, r.NextTitle); return Results.NoContent(); });
 
+        // ---------------- catalogue import & bulk changes
+        api.MapGet("/products/import/template", (AppServices app) =>
+        {
+            app.Session.Demand(FurniShop.Core.Security.Perm.ProductImport);
+            return Results.File(ProductImportService.Template(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "product-import-template.xlsx");
+        });
+        api.MapPost("/products/import/preview", async (IFormFile file, AppServices app) =>
+        {
+            if (file.Length > 5 * 1024 * 1024) throw new ValidationException("File", "The file is larger than 5 MB.");
+            var name = file.FileName ?? "import.csv";
+            if (!(name.EndsWith(".csv", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase)))
+                throw new ValidationException("File", "Upload a .csv or .xlsx file.");
+            await using var stream = file.OpenReadStream();
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            return await app.ProductImport.PreviewAsync(ms.ToArray(), name);
+        }).DisableAntiforgery().RequireRateLimiting("heavy");
+        api.MapPost("/products/import/commit", async (List<ImportRow> rows, AppServices app) => await app.ProductImport.CommitAsync(rows)).RequireRateLimiting("heavy");
+        api.MapPost("/products/bulk", async (BulkProductUpdate u, AppServices app) => new { updated = await app.ProductImport.BulkUpdateAsync(u) });
+
+        // ---------------- analytics
+        api.MapGet("/analytics", async (DateTime from, DateTime to, DateTime? compareFrom, DateTime? compareTo, AppServices app) =>
+            await app.Analytics.CompareAsync(from, to, compareFrom, compareTo)).RequireRateLimiting("heavy");
+
+        // ---------------- order 360°
+        api.MapGet("/lifecycle/{kind}/{id:long}", async (string kind, long id, AppServices app) => await app.Lifecycle.ForAsync(kind, id));
+
         // ---------------- cash register
         api.MapGet("/cash", async (DateTime? date, AppServices app) => await app.Cash.DayAsync(date));
         api.MapGet("/cash/history", async (AppServices app) => await app.Cash.HistoryAsync());

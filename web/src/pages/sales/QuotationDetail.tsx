@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRightCircle, Ban, CheckCircle2, Copy, Pencil, XCircle } from 'lucide-react';
+import { ArrowRightCircle, Ban, CheckCircle2, Copy, Pencil, Workflow, XCircle } from 'lucide-react';
 import { api, errorMessage } from '@/lib/api';
 import { addDays, date, dateTime, iso, money } from '@/lib/format';
 import { P } from '@/lib/perms';
@@ -43,6 +43,7 @@ export default function QuotationDetail() {
         title={<span className="doc-no" style={{ fontSize: 'inherit' }}>{q.number}</span>} badge={<Status value={q.status} />}
         desc={<>{date(q.date)} · {q.customerName} · valid until {date(q.validUntil)}</>}
         actions={<>
+          <Link className="btn btn-ghost" to={`/360/QUOTATION/${id}`} title="Everything linked to this document"><Workflow aria-hidden />360°</Link>
           {open && can(P.SalesOrderManage) && <button className="btn btn-primary" onClick={() => setConvert(true)}><ArrowRightCircle aria-hidden />Convert to order</button>}
           {q.status === 'DRAFT' && can(P.QuotationManage) && <Link className="btn" to={`/sales/quotations/${q.id}/edit`}><Pencil aria-hidden />Edit</Link>}
           <DocActionsButtons base={`/api/quotations/${q.id}`} name={`${q.number} ${q.customerName}`} />

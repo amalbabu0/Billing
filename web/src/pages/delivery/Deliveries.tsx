@@ -9,7 +9,8 @@ import { P } from '@/lib/perms';
 import type { Delivery, DocumentPosition, StatusHistory } from '@/lib/types';
 import { useCan, useLookups, useMe, useToast } from '@/app/providers';
 import { DataTable, type Column } from '@/components/DataTable';
-import { DocNo, EmptyState, ErrorPanel, KV, Notice, PageHeader, Segmented, SkeletonRows, Status, Timeline } from '@/components/ui/display';
+import { Badge, DocNo, EmptyState, ErrorPanel, KV, Notice, PageHeader, Segmented, SkeletonRows, Status, Timeline } from '@/components/ui/display';
+import { PRIORITY_TONE } from '@/lib/status';
 import { NumberInput, SearchInput, Select, TextArea, TextInput } from '@/components/ui/form';
 import { Drawer, Modal, useConfirm } from '@/components/ui/overlay';
 import { WhatsAppDialog } from '@/components/DocActions';
@@ -63,7 +64,9 @@ function Board({ onOpen }: { onOpen: (id: number) => void }) {
                 const late = d.scheduledDate && isoInput(d.scheduledDate) < today && d.status !== 'DELIVERED';
                 return (
                   <button key={d.id} className="dcard" onClick={() => onOpen(d.id)}>
-                    <div className="row between"><span className="doc-no text-sm">{d.number}</span>{d.status === 'FAILED' ? <Status value="FAILED" /> : late ? <Status value="OVERDUE" text="Late" /> : null}</div>
+                    <div className="row between"><span className="doc-no text-sm">{d.number}</span><span className="row gap-1">
+                      {d.priority && d.priority !== 'NORMAL' && d.priority !== 'LOW' && <Badge tone={PRIORITY_TONE[d.priority]}>{d.priority.toLowerCase()}</Badge>}
+                      {d.status === 'FAILED' ? <Status value="FAILED" /> : late ? <Status value="OVERDUE" text="Late" /> : null}</span></div>
                     <div className="medium">{d.customerName}</div>
                     <div className="addr">{d.deliveryAddress}</div>
                     {d.itemsSummary && <div className="text-xs soft truncate">{d.itemsSummary}</div>}
@@ -71,6 +74,7 @@ function Board({ onOpen }: { onOpen: (id: number) => void }) {
                       {d.scheduledDate && <span className="row gap-1"><CalendarClock aria-hidden />{date(d.scheduledDate)}{d.timeSlot ? ` · ${d.timeSlot}` : ''}</span>}
                       {d.driverName && <span className="row gap-1"><User aria-hidden />{d.driverName}</span>}
                       {d.vehicleNo && <span className="row gap-1"><Truck aria-hidden />{d.vehicleNo}</span>}
+                      {d.route && <span className="row gap-1"><MapPin aria-hidden />{d.route}{d.routeOrder ? ` · stop ${d.routeOrder}` : ''}</span>}
                       {d.status === 'DELIVERED' && d.deliveredAt && <span className="row gap-1"><CheckCircle2 aria-hidden />{dateTime(d.deliveredAt)}</span>}
                     </div>
                   </button>
@@ -92,6 +96,8 @@ function DeliveryList({ view, status, onOpen }: { view: string; status?: string;
     { key: 'src', header: 'Against', render: r => <span className="doc-no text-sm">{r.sourceNumber}</span>, exportValue: r => r.sourceNumber },
     { key: 'c', header: 'Customer', mobile: 'sub', render: r => <div className="cell-stack"><span className="cell-title">{r.customerName}</span><span className="cell-sub truncate" style={{ maxWidth: 280 }}>{r.deliveryAddress}</span></div>, exportValue: r => r.customerName },
     { key: 'd', header: status === 'DELIVERED' ? 'Delivered' : 'Scheduled', mobile: 'meta', render: r => status === 'DELIVERED' ? dateTime(r.deliveredAt) : r.scheduledDate ? `${date(r.scheduledDate)}${r.timeSlot ? ` · ${r.timeSlot}` : ''}` : <span className="muted">Not scheduled</span>, exportValue: r => date(r.deliveredAt ?? r.scheduledDate) },
+    { key: 'rt', header: 'Route', optional: true, render: r => r.route ? `${r.route}${r.routeOrder ? ` · ${r.routeOrder}` : ''}` : '—', exportValue: r => r.route },
+    { key: 'pr', header: 'Priority', optional: true, render: r => r.priority && r.priority !== 'NORMAL' ? <Badge tone={PRIORITY_TONE[r.priority]}>{r.priority.toLowerCase()}</Badge> : '—', exportValue: r => r.priority },
     { key: 'dr', header: 'Driver / vehicle', mobile: 'meta', render: r => [r.driverName, r.vehicleNo].filter(Boolean).join(' · ') || '—', exportValue: r => [r.driverName, r.vehicleNo].filter(Boolean).join(' · ') },
     { key: 'i', header: 'Items', optional: true, render: r => <span className="text-sm soft">{r.itemsSummary}</span>, exportValue: r => r.itemsSummary },
     { key: 'r', header: 'Received by', optional: status !== 'DELIVERED', render: r => r.receiverName ?? '—', exportValue: r => r.receiverName },
@@ -157,7 +163,8 @@ export function DeliveryDrawer({ id, onClose }: { id: number | null; onClose: ()
           <KV items={[
             ['Against', <DocNo to={d.invoiceId ? `/sales/invoices/${d.invoiceId}` : d.salesOrderId ? `/sales/orders/${d.salesOrderId}` : d.customOrderId ? `/custom-orders/${d.customOrderId}` : undefined}>{d.sourceNumber}</DocNo>],
             ['Scheduled', d.scheduledDate ? `${date(d.scheduledDate)}${d.timeSlot ? ` · ${d.timeSlot}` : ''}` : 'Not yet'],
-            ['Driver', d.driverName ?? '—'], ['Vehicle', d.vehicleNo ?? '—'],
+            ['Driver', d.driverName ?? '—'], ['Vehicle', d.vehicleNo ?? '—'], !!d.route && ['Route', `${d.route}${d.routeOrder ? ` · stop ${d.routeOrder}` : ''}`],
+            !!d.priority && d.priority !== 'NORMAL' && ['Priority', <Badge tone={PRIORITY_TONE[d.priority]}>{d.priority.toLowerCase()}</Badge>],
             ['Delivery charge', money(d.deliveryCharge)],
             d.deliveryCost != null && ['Trip cost', money(d.deliveryCost)],
             d.hasOtp && ['OTP', d.otpVerified ? 'Verified' : 'Sent to customer'],
@@ -194,12 +201,14 @@ function ScheduleModal({ open, onClose, delivery, onDone }: { open: boolean; onC
   const me = useMe();
   const { data: lookups } = useLookups();
   const drivers = (lookups?.staff ?? []).filter(s => s.roleCode === 'DELIVERY' || s.roleCode === 'MANAGER' || s.roleCode === 'ADMIN');
-  const [f, setF] = useState({ date: isoInput(delivery.scheduledDate) || iso(), timeSlot: delivery.timeSlot ?? SLOTS[0], driverUserId: delivery.driverUserId ? String(delivery.driverUserId) : '', driverName: delivery.driverName ?? '', vehicleNo: delivery.vehicleNo ?? '', deliveryCost: delivery.deliveryCost ?? null as number | null });
+  const [f, setF] = useState({ date: isoInput(delivery.scheduledDate) || iso(), timeSlot: delivery.timeSlot ?? SLOTS[0], driverUserId: delivery.driverUserId ? String(delivery.driverUserId) : '', driverName: delivery.driverName ?? '', vehicleNo: delivery.vehicleNo ?? '', deliveryCost: delivery.deliveryCost ?? null as number | null,
+    priority: delivery.priority ?? 'NORMAL', route: delivery.route ?? '', routeOrder: delivery.routeOrder ?? null as number | null });
   const [otp, setOtp] = useState<string | null>(null);
   const go = useMutation({
     mutationFn: () => {
       const staff = drivers.find(s => String(s.id) === f.driverUserId);
-      return api.post<{ otp?: string }>(`/api/deliveries/${delivery.id}/schedule`, { date: f.date, timeSlot: f.timeSlot, driverUserId: staff?.id ?? null, driverName: staff?.fullName ?? (f.driverName || null), vehicleNo: f.vehicleNo || null, deliveryCost: f.deliveryCost });
+      return api.post<{ otp?: string }>(`/api/deliveries/${delivery.id}/schedule`, { date: f.date, timeSlot: f.timeSlot, driverUserId: staff?.id ?? null, driverName: staff?.fullName ?? (f.driverName || null), vehicleNo: f.vehicleNo || null, deliveryCost: f.deliveryCost,
+        priority: f.priority, route: f.route || null, routeOrder: f.routeOrder });
     },
     onSuccess: r => { toast.success('Delivery scheduled'); if (r.otp) setOtp(r.otp); else { onDone(); onClose(); } },
     onError: e => toast.error('Not scheduled', errorMessage(e)),
@@ -227,6 +236,12 @@ function ScheduleModal({ open, onClose, delivery, onDone }: { open: boolean; onC
           <Select label="Driver" value={f.driverUserId} onChange={e => setF({ ...f, driverUserId: e.target.value })} options={[{ value: '', label: 'Other / outside driver' }, ...drivers.map(s => ({ value: String(s.id), label: s.fullName }))]} />
           {!f.driverUserId ? <TextInput label="Driver name" optional value={f.driverName} onChange={e => setF({ ...f, driverName: e.target.value })} /> : <span />}
         </div>
+        <div className="grid grid-3">
+          <Select label="Priority" value={f.priority} onChange={e => setF({ ...f, priority: e.target.value as NonNullable<Delivery['priority']> })} options={['LOW', 'NORMAL', 'HIGH', 'URGENT'].map(p => ({ value: p, label: p.charAt(0) + p.slice(1).toLowerCase() }))} />
+          <TextInput label="Route / area" optional list="delivery-routes" value={f.route} onChange={e => setF({ ...f, route: e.target.value })} placeholder="Whitefield" />
+          <NumberInput label="Stop no." optional value={f.routeOrder} min={1} max={99} onChange={v => setF({ ...f, routeOrder: v })} />
+        </div>
+        <datalist id="delivery-routes">{['North Bengaluru', 'South Bengaluru', 'East — Whitefield / KR Puram', 'West — Rajajinagar / Vijayanagar', 'Central', 'Outstation'].map(r => <option key={r} value={r} />)}</datalist>
         <div className="grid grid-2">
           <TextInput label="Vehicle no." optional value={f.vehicleNo} onChange={e => setF({ ...f, vehicleNo: e.target.value.toUpperCase() })} placeholder="KA 01 AB 1234" />
           {me.canSeeCost && <NumberInput label="Trip cost" optional money value={f.deliveryCost} onChange={v => setF({ ...f, deliveryCost: v })} hint="Internal — not billed" />}

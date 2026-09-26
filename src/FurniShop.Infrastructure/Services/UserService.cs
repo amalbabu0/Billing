@@ -161,6 +161,7 @@ public sealed class UserService(Db db, UserSession session, AuditService audit)
             .Check(u.RoleId > 0, nameof(u.RoleId), "Select a role.")
             .Optional(u.Mobile, Validators.IsValidMobile, nameof(u.Mobile), "Mobile number is not valid.")
             .Optional(u.Email, Validators.IsValidEmail, nameof(u.Email), "Email is not valid.")
+            .Check(u.CommissionPercent is >= 0 and <= 100, nameof(u.CommissionPercent), "Commission must be 0–100%.")
             .ThrowIfInvalid();
 
         return await db.InTransactionAsync(async (conn, tx) =>
@@ -170,9 +171,9 @@ public sealed class UserService(Db db, UserSession session, AuditService audit)
             if (u.Id == 0)
             {
                 u.Id = await conn.ExecuteScalarAsync<long>("""
-                    insert into users (username, full_name, mobile, email, role_id, password_hash, must_change_password, is_active)
-                    values (@Username, @FullName, @Mobile, @Email, @RoleId, @hash, true, @IsActive) returning id
-                    """, new { Username = u.Username.Trim(), u.FullName, u.Mobile, u.Email, u.RoleId, hash = PasswordHasher.Hash(newPassword!), u.IsActive }, tx);
+                    insert into users (username, full_name, mobile, email, role_id, password_hash, must_change_password, is_active, commission_percent)
+                    values (@Username, @FullName, @Mobile, @Email, @RoleId, @hash, true, @IsActive, @CommissionPercent) returning id
+                    """, new { Username = u.Username.Trim(), u.FullName, u.Mobile, u.Email, u.RoleId, hash = PasswordHasher.Hash(newPassword!), u.IsActive, u.CommissionPercent }, tx);
                 await audit.LogAsync(conn, tx, "CREATE", "Employees", $"created user {u.Username}", "user", u.Id, u.Username, null, new { u.Username, u.FullName, u.RoleId });
             }
             else
@@ -182,7 +183,7 @@ public sealed class UserService(Db db, UserSession session, AuditService audit)
                     throw new BusinessRuleException("You cannot disable yourself or change your own role.");
                 await EnsureAdminRemainsAsync(conn, tx, u.Id, u.RoleId, u.IsActive);
                 await conn.ExecuteAsync("""
-                    update users set full_name=@FullName, mobile=@Mobile, email=@Email, role_id=@RoleId, is_active=@IsActive, updated_at=now() where id=@Id
+                    update users set full_name=@FullName, mobile=@Mobile, email=@Email, role_id=@RoleId, is_active=@IsActive, commission_percent=@CommissionPercent, updated_at=now() where id=@Id
                     """, u, tx);
                 if (!string.IsNullOrEmpty(newPassword))
                     await conn.ExecuteAsync("""
