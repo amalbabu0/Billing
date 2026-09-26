@@ -67,6 +67,7 @@ export const NAV: NavGroup[] = [
   },
   {
     label: 'Delivery', icon: Truck, children: [
+      { label: 'Delivery board', to: '/delivery/all', perms: [P.DeliveryView] },
       { label: 'Pending', to: '/delivery/pending', perms: [P.DeliveryView] },
       { label: 'Scheduled', to: '/delivery/scheduled', perms: [P.DeliveryView] },
       { label: 'Out for delivery', to: '/delivery/out', perms: [P.DeliveryView] },

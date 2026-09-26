@@ -1,12 +1,13 @@
 # FurniShop — Furniture Shop Billing & Management
 
-A Windows desktop application (WPF, .NET 8) for Indian furniture retailers: GST billing / POS, quotations → sales orders → invoices, advances and part payments, customer credit, inventory with reservations, purchases and suppliers, custom-made orders, deliveries with proof, installations, expenses, reports, users and permissions. Data is stored in **PostgreSQL**, designed for **Neon** (serverless Postgres) so several counters or branches can share one database.
+Billing and shop management for Indian furniture retailers, available as a **browser app** (ASP.NET Core 8 API + React client, runs on any PC, tablet or phone) and a **Windows desktop app** (WPF), both on the same database and business services: GST billing / POS, quotations → sales orders → invoices, advances and part payments, customer credit, inventory with reservations, purchases and suppliers, custom-made orders, deliveries with proof, installations, expenses, reports, users and permissions. Data is stored in **PostgreSQL**, designed for **Neon** (serverless Postgres) so several counters or branches can share one database.
 
 ---
 
 ## Contents
 
 1. [Quick start](#quick-start)
+   * [Web app](#web-app-browser)
 2. [Setting up Neon](#setting-up-neon)
 3. [Features](#features)
 4. [Keyboard shortcuts](#keyboard-shortcuts)
@@ -43,6 +44,20 @@ On first launch:
 2. The database schema is created automatically (migrations run on every start and are safe to repeat).
 3. **Create the owner account** – shop name, state, GSTIN (optional) and an administrator login. Tick *Load demo data* to explore with sample data.
 4. Sign in.
+
+### Web app (browser)
+
+**Requirements:** .NET 8 SDK, Node.js 20+ (only to build the client), PostgreSQL 14+ / Neon.
+
+```bash
+cd web && npm ci && npx vite build          # builds the React client into src/FurniShop.Web/wwwroot
+cd .. && export FURNISHOP_DB="postgresql://user:pass@host/db?sslmode=require"   # or ConnectionStrings:FurniShop in appsettings
+dotnet run --project src/FurniShop.Web      # open the URL printed at start-up
+```
+
+Migrations run at start-up. On an empty database the first screen creates the owner account (tick *Load demo data* to explore). For client development run the server with `ASPNETCORE_URLS=http://127.0.0.1:5080` and `npx vite` in `web/` (port 5173, proxies `/api` to 5080).
+
+Put the site behind HTTPS in production (a reverse proxy such as Caddy, nginx or IIS, or a platform like Azure App Service / Render). The browser never sees the database credentials — only the server holds them.
 
 ### Demo data
 
@@ -120,6 +135,8 @@ Neon suspends idle compute; the first request after a pause can take a second or
 FurniShop.sln
 ├─ src/FurniShop.Core            Domain models, GST calculator, money & Indian formatting, validators (GSTIN, mobile, PIN), permissions, settings, message templates. No I/O.
 ├─ src/FurniShop.Infrastructure  PostgreSQL (Npgsql + Dapper), migrations, all business services, PDF/print layouts (PDFsharp), barcodes/QR (ZXing), Excel (ClosedXML), backup.
+├─ src/FurniShop.Web             ASP.NET Core 8 minimal API: cookie auth, per-request permission session, CSRF, rate limiting, problem+json errors; serves the built client.
+├─ web/                          React 19 + TypeScript + Vite client (TanStack Query, React Router). Design tokens in web/src/styles/tokens.css — see docs/DESIGN.md.
 ├─ src/FurniShop.Wpf             WPF MVVM desktop app (CommunityToolkit.Mvvm). Views are data templates; printing via WPF FixedDocument.
 ├─ tools/FurniShop.Cli           furnishop-cli: migrate, create admin, seed demo data, render sample PDFs.
 └─ tests/FurniShop.Tests         xUnit: unit tests + end-to-end workflow tests against a real PostgreSQL.
@@ -157,9 +174,10 @@ Migrations live in `src/FurniShop.Infrastructure/Database/Migrations` and are em
 
 * Passwords are hashed with PBKDF2-SHA256 (210,000 iterations, per-user salt). Accounts lock after repeated failed sign-ins (configurable). Forced password change on first sign-in for users created by an admin. Idle auto sign-out.
 * Every service method checks permissions for the signed-in user before reading or changing data; the UI hiding buttons is only a convenience.
-* The database connection string is encrypted with Windows DPAPI for the current user and never shown back.
+* **Web app.** Session cookie is HttpOnly, SameSite=Strict (Secure over HTTPS) and re-validated on each request against the user's current state (disabled, locked, password changed → signed out). Unsafe requests need a double-submit anti-forgery token (`X-XSRF-TOKEN`). Sign-in is limited to 10 attempts per 5 minutes per address, exports and reports to 40 per minute, and everything else by a token bucket. Strict Content-Security-Policy (`script-src 'self'`), `X-Content-Type-Options`, `Referrer-Policy` and same-origin-only framing are set. Cost and profit fields are removed on the server for roles without *See cost price*, not just hidden.
+* Desktop: the database connection string is encrypted with Windows DPAPI for the current user and never shown back.
 * All SQL is parameterised. CSV exports neutralise spreadsheet formula injection. Uploaded files are checked by content (JPEG / PNG / WEBP / PDF) and size (5 MB).
-* **Trust boundary — please read.** This is a two-tier desktop application: each PC connects directly to PostgreSQL with the database credentials. Permission checks run in the app, so anyone who extracts those credentials from a shop PC could bypass them and use the database directly. The database triggers still protect payments, stock history and the audit log from edits and deletes, but for stronger isolation:
+* **Trust boundary (desktop app) — please read.** The web app keeps credentials on the server; the desktop app is two-tier: each PC connects directly to PostgreSQL with the database credentials. Permission checks run in the app, so anyone who extracts those credentials from a shop PC could bypass them and use the database directly. The database triggers still protect payments, stock history and the audit log from edits and deletes, but for stronger isolation:
   * use a dedicated Neon role for the app (not the project owner) and keep the owner credentials off shop PCs;
   * use Windows accounts with passwords on shop PCs and turn on disk encryption (BitLocker);
   * rotate the Neon password if a PC is lost (Neon console → Roles → Reset password), then reconnect each PC via *Settings → Security → Connect to a different database*.
@@ -205,7 +223,7 @@ Workflow tests need a PostgreSQL server; each test class creates and drops its o
 export FURNISHOP_TEST_DB="Host=127.0.0.1;Port=5432;Username=postgres;Password=...;Database=postgres"
 ```
 
-Without a server they are skipped (unit tests still run). The 38 tests cover GST maths (intra/inter-state, inclusive/exclusive, rounding), validators, cash / credit / split-payment sales, quotation → order → invoice with advances, reservations, negative-stock rules, returns and refunds, exchanges, invoice cancellation, immutability of payments, concurrent invoice numbering, purchases and supplier ledger, custom order to installation, delivery proof, permissions and lockout, and consistency between reports, PDFs and exports on the demo data set.
+Without a server they are skipped (unit tests still run). The 47 tests cover GST maths (intra/inter-state, inclusive/exclusive, rounding), validators, cash / credit / split-payment sales, quotation → order → invoice with advances, reservations, negative-stock rules, returns and refunds, exchanges, invoice cancellation, immutability of payments, concurrent invoice numbering, purchases and supplier ledger, custom order to installation, delivery proof, permissions and lockout, consistency between reports, PDFs and exports on the demo data set, GST listings / HSN / rate summaries / debit notes reconciling with invoices, and the web API pipeline (CSRF, sign-in, every GET endpoint, cost hiding for sales staff, forced password change, disabled users, rate limiting).
 
 The WPF project builds on any OS with the .NET 8 SDK (`EnableWindowsTargeting`), but only runs on Windows.
 
@@ -216,4 +234,5 @@ The WPF project builds on any OS with the .NET 8 SDK (`EnableWindowsTargeting`),
 * WhatsApp sharing opens WhatsApp (desktop or web) with the message pre-filled; the user presses Send and attaches the saved PDF. Fully automatic sending needs the WhatsApp Business API, which requires a Meta business account — not included.
 * E-invoicing (IRN / QR from the GST portal) and e-way bills are not integrated; GST reports are prepared for filing but not uploaded.
 * The application needs an internet connection to Neon; there is no offline mode.
+* Web app: delivery proof photos and signatures are captured in the browser; test the signature pad on the tablets you will use.
 * Built and tested on Linux (business logic, database, PDFs, and a full WPF compile); the desktop UI itself should be checked on Windows before rollout — screen layouts, printing to your specific printers, and the signature pad on touch screens.

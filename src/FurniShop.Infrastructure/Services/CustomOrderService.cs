@@ -192,7 +192,7 @@ public sealed class CustomOrderService(Db db, UserSession session, AuditService 
         session.Demand(Perm.CustomOrderView);
         var stageSql = stage switch
         {
-            "ACTIVE" => "and o.status in ('RECEIVED','PRODUCTION','QUALITY_CHECK')",
+            "ACTIVE" => "and o.status in ('RECEIVED','DESIGN','PRODUCTION','QUALITY_CHECK')",
             "READY" => "and o.status in ('READY','DELIVERY','INSTALLATION')",
             "COMPLETED" => "and o.status in ('COMPLETED','CANCELLED')",
             _ => "",

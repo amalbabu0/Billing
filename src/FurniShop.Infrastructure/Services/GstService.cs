@@ -487,12 +487,14 @@ public sealed class GstService(Db db, UserSession session)
                   from invoices i join invoice_items it on it.invoice_id = i.id
                   where i.status = 'FINAL' and i.invoice_date between @From and @To group by it.gst_rate
                   union all
-                  select 'Delivery & installation', null, count(*), sum(i.delivery_charge + i.installation_charge),
+                  -- charges carry no stored rate; it is implied by tax ÷ taxable (whole-number GST slabs)
+                  select 'Delivery & installation', round(100 * i.charges_tax / (i.delivery_charge + i.installation_charge)), count(*),
+                         sum(i.delivery_charge + i.installation_charge),
                          sum(case when not i.is_inter_state then round(i.charges_tax / 2, 2) else 0 end),
                          sum(case when not i.is_inter_state then i.charges_tax - round(i.charges_tax / 2, 2) else 0 end),
                          sum(case when i.is_inter_state then i.charges_tax else 0 end)
                   from invoices i where i.status = 'FINAL' and i.invoice_date between @From and @To and (i.delivery_charge + i.installation_charge) > 0
-                  having count(*) > 0
+                  group by 2
               ) x order by supply desc, rate
               """, new { From = from.Date, To = to.Date });
 

@@ -121,7 +121,7 @@ public class GstAndWorkspaceTests(DbFixture f) : IClassFixture<DbFixture>
         var rates = await f.App.Gst.RateSummaryAsync(from, to);
         Assert.Equal(dash.Sales.Tax, rates.Sum(r => r.TotalTax));
         var hsn = await f.App.Gst.HsnSummaryAsync(from, to);
-        var charges = rates.Where(r => r.Rate is null).Sum(r => r.TotalTax);
+        var charges = rates.Where(r => r.Supply != "Goods").Sum(r => r.TotalTax);
         Assert.Equal(dash.Sales.Tax - charges, hsn.Sum(h => h.TotalTax));
 
         // Component ledgers split the totals exactly.

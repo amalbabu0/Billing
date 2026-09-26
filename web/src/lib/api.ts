@@ -122,3 +122,9 @@ export function errorMessage(e: unknown): string {
   if (e instanceof Error) return e.message;
   return 'Something went wrong.';
 }
+
+export interface ExportColumn { key: string; label: string; money?: boolean }
+/** Sends already-loaded rows to the server's generic table export (CSV / Excel / PDF, audited). */
+export function exportTable(opts: { title: string; subtitle?: string; format: 'csv' | 'xlsx' | 'pdf'; columns: ExportColumn[]; rows: Record<string, unknown>[]; totals?: { label: string; value: string }[] }) {
+  return download('POST', '/api/export', `${opts.title}.${opts.format}`, { ...opts, columns: opts.columns.map(c => ({ ...c, money: !!c.money })) });
+}

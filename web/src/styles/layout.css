@@ -162,3 +162,9 @@
   .dash-hero h1 { font-size: 21px; }
   .global-search .truncate { font-size: var(--text-sm); }
 }
+
+/* two-panel content rows that stack on narrow screens */
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s-4); align-items: start; }
+.split.wide-left { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+.split.narrow-left { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
+@media (max-width: 1000px) { .split, .split.wide-left, .split.narrow-left { grid-template-columns: minmax(0, 1fr); } }

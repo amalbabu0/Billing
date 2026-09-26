@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useId, useState, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import { forwardRef, useEffect, useId, useState, type InputHTMLAttributes, type ReactNode, type Ref, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { AlertCircle, Search, X } from 'lucide-react';
 
 interface FieldProps { label?: ReactNode; hint?: ReactNode; error?: string; required?: boolean; optional?: boolean; children: (id: string, describedBy?: string) => ReactNode; className?: string }
@@ -95,10 +95,10 @@ export function Select({ label, hint, error, optional, options, placeholder, chi
   return <Field label={label} hint={hint} error={error} required={required} optional={optional} className={wrapClass}>{control}</Field>;
 }
 
-export function TextArea({ label, hint, error, optional, className = '', required, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement> & { label?: ReactNode; hint?: ReactNode; error?: string; optional?: boolean }) {
+export function TextArea({ label, hint, error, optional, className = '', required, ref, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement> & { label?: ReactNode; hint?: ReactNode; error?: string; optional?: boolean; ref?: Ref<HTMLTextAreaElement> }) {
   return (
     <Field label={label} hint={hint} error={error} required={required} optional={optional}>
-      {(id, d) => <textarea id={id} className={`textarea ${className}`} aria-invalid={error ? true : undefined} aria-describedby={d} required={required} {...rest} />}
+      {(id, d) => <textarea ref={ref} id={id} className={`textarea ${className}`} aria-invalid={error ? true : undefined} aria-describedby={d} required={required} {...rest} />}
     </Field>
   );
 }

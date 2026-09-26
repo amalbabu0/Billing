@@ -426,3 +426,4 @@ a.list-row:hover, button.list-row:hover { background: var(--surface-hover); text
   display: flex; gap: var(--s-2); align-items: center; justify-content: flex-end;
 }
 .color-swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex-shrink: 0; }
+.code-block { font-family: var(--font-mono); font-size: var(--text-xs); background: var(--surface-sunken); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: var(--s-3); white-space: pre-wrap; word-break: break-word; margin: 4px 0 0; max-height: 320px; overflow: auto; }
