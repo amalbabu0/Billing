@@ -14,7 +14,7 @@ export function stockPage() {
   const cur = r => (loc ? st.stockOf(r.id, loc) : st.stockOf(r.id));
   const d = r => st.stockDetail(r.id);
   const cols = [
-    { key: 'code', label: 'Item Code', render: r => h('span', { class: 'mono' }, r.code) }, { key: 'name', label: 'Item Name' }, { key: 'category', label: 'Category' },
+    { key: 'code', label: 'Item Code', sticky: true, render: r => h('span', { class: 'mono' }, r.code) }, { key: 'name', label: 'Item Name', sticky: true }, { key: 'category', label: 'Category' },
     { key: 'hsn', label: 'HSN' }, { key: 'unit', label: 'Unit' },
     { key: 'opening', label: 'Opening', type: 'qty', value: r => d(r).opening }, { key: 'purchased', label: 'Purchased', type: 'qty', value: r => d(r).purchased },
     { key: 'sold', label: 'Sold', type: 'qty', value: r => d(r).sold }, { key: 'pr', label: 'Pur. Return', type: 'qty', value: r => d(r).pr }, { key: 'sr', label: 'Sales Return', type: 'qty', value: r => d(r).sr },

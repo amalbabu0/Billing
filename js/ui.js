@@ -187,6 +187,7 @@ export function fmt(v, type) {
  * columns: [{ key, label, type, value(row), render(row), total: true | fn(rows), cls, width }]
  * Returns an element with .setRows(rows) and .getView() (filtered+sorted rows).
  */
+const TRUNCATE = new Set(['desc', 'description', 'notes', 'reason', 'items']);
 export function dataTable({ columns, rows = [], onRowClick, pageSize = 50, empty = 'No records found', rowClass, compact = true, keyOf = r => r.id, maxHeight }) {
   let data = rows, sortKey = null, sortDir = 1, page = 1;
   const val = (c, r) => (c.value ? c.value(r) : r[c.key]);
@@ -206,7 +207,7 @@ export function dataTable({ columns, rows = [], onRowClick, pageSize = 50, empty
     page = Math.min(page, pages);
     const slice = all.slice((page - 1) * pageSize, page * pageSize);
     const thead = h('thead', null, h('tr', null, columns.map(c => h('th', {
-      class: `${isNum(c) ? 'num' : ''} ${c.sortable === false ? '' : 'sortable'} ${sortKey === c.key ? (sortDir > 0 ? 'asc' : 'desc') : ''}`, style: c.width ? { width: c.width } : null,
+      class: `${c.sticky ? 'sticky-col ' : ''}${isNum(c) ? 'num' : ''} ${c.sortable === false ? '' : 'sortable'} ${sortKey === c.key ? (sortDir > 0 ? 'asc' : 'desc') : ''}`, style: c.width ? { width: c.width } : null,
       tabindex: c.sortable === false ? null : '0', 'aria-sort': sortKey === c.key ? (sortDir > 0 ? 'ascending' : 'descending') : null,
       onclick: () => { if (c.sortable === false) return; if (sortKey === c.key) sortDir = -sortDir; else { sortKey = c.key; sortDir = isNum(c) || c.type === 'date' ? -1 : 1; } render(); },
       onkeydown: e => { if (e.key === 'Enter') e.currentTarget.click(); },
@@ -215,7 +216,11 @@ export function dataTable({ columns, rows = [], onRowClick, pageSize = 50, empty
     if (!slice.length) tbody.append(h('tr', { class: 'empty-row' }, h('td', { colspan: columns.length }, h('div', { class: 'empty' }, icon('search'), h('div', null, empty)))));
     for (const r of slice) {
       const tr = h('tr', { class: `${onRowClick ? 'clickable' : ''} ${rowClass ? rowClass(r) || '' : ''}`, tabindex: onRowClick ? '0' : null, dataset: { key: keyOf(r) ?? '' } },
-        columns.map(c => { const content = c.render ? c.render(r) : fmt(val(c, r), c.type); return h('td', { class: `${isNum(c) ? 'num' : ''} ${c.cls || ''}` }, content); }));
+        columns.map(c => {
+          const content = c.render ? c.render(r) : fmt(val(c, r), c.type);
+          const trunc = c.truncate ?? TRUNCATE.has(c.key);
+          return h('td', { class: `${isNum(c) ? 'num' : ''} ${c.cls || ''} ${trunc ? 'truncate-cell' : ''} ${c.sticky ? 'sticky-col' : ''}`, title: trunc ? String(val(c, r) ?? '') : null }, content);
+        }));
       if (onRowClick) {
         tr.addEventListener('click', e => { if (e.target.closest('button, a, input, select')) return; onRowClick(r); });
         tr.addEventListener('keydown', e => {
@@ -233,6 +238,15 @@ export function dataTable({ columns, rows = [], onRowClick, pageSize = 50, empty
       return h('td', { class: isNum(c) ? 'num' : '' }, fmt(v, c.type));
     }))) : null;
     fill(table, thead, tbody, tfoot || '');
+    if (columns.some(c => c.sticky)) requestAnimationFrame(() => {
+      // Pin sticky columns: each one's left offset is the width of the sticky columns before it.
+      let left = 0;
+      columns.forEach((c, i) => {
+        if (!c.sticky) return;
+        table.querySelectorAll(`tr > :nth-child(${i + 1})`).forEach(cell => { cell.style.left = left + 'px'; });
+        left += table.querySelector(`thead th:nth-child(${i + 1})`)?.offsetWidth || 0;
+      });
+    });
     fill(pager, 
       h('span', { class: 'muted' }, all.length ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, all.length)} of ${all.length}` : '0 records'),
       pages > 1 ? h('span', { class: 'pager-btns' },

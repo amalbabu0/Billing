@@ -2,6 +2,7 @@ import * as st from '../store.js';
 import { h, matches, qty, fill } from '../utils.js';
 import { icon, pageHeader, dataTable, searchBox, modal, field, input, num, select, attempt, statusBadge, exportButtons, badge } from '../ui.js';
 import { query, navigate, onMounted } from '../router.js';
+import { stateFromCode } from '../gst.js';
 
 const INDIAN_STATES = ['Andhra Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Delhi', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Odisha', 'Puducherry', 'Punjab', 'Rajasthan', 'Tamil Nadu', 'Telangana', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal'];
 export { INDIAN_STATES };
@@ -144,9 +145,8 @@ export function partyForm(p, type, onSaved) {
   const v = p ? { ...p } : { type, name: '', gstin: '', state: st.S().business.state, phone: '', address: '', opening: 0, creditDays: type === 'customer' ? 30 : 30 };
   const f = { name: input({ value: v.name, autofocus: true }), gstin: input({ value: v.gstin, maxlength: 15, class: 'input mono' }), state: select(INDIAN_STATES, v.state), phone: input({ value: v.phone, inputmode: 'tel' }), address: input({ value: v.address }), opening: num({ value: v.opening }), creditDays: num({ value: v.creditDays, min: 0 }) };
   f.gstin.addEventListener('input', () => {
-    const code = f.gstin.value.slice(0, 2);
-    const map = { '32': 'Kerala', '33': 'Tamil Nadu', '29': 'Karnataka', '24': 'Gujarat', '27': 'Maharashtra', '07': 'Delhi', '36': 'Telangana', '37': 'Andhra Pradesh', '19': 'West Bengal', '09': 'Uttar Pradesh', '08': 'Rajasthan', '30': 'Goa' };
-    if (map[code]) f.state.value = map[code];
+    const state = stateFromCode(f.gstin.value.slice(0, 2));
+    if (state && INDIAN_STATES.includes(state)) f.state.value = state;
   });
   const save = () => {
     const rec = attempt(() => st.saveParty({ ...v, name: f.name.value, gstin: f.gstin.value.trim(), state: f.state.value, phone: f.phone.value.trim(), address: f.address.value.trim(), opening: +f.opening.value || 0, creditDays: +f.creditDays.value || 0 }), r => `${r.name} saved`);

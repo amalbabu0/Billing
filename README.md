@@ -26,7 +26,7 @@ Every button does something real. Stock, balances, GST and reports are all calcu
 | **Dashboard** | Today's sales and purchases, cash and bank balance, receivable, payable, stock value, low stock, customer and supplier counts. Charts: 30-day sales vs purchases, top products, category sales. Recent sales, purchases, returns and payments. Quick actions. |
 | **Main Menu** | Tile menu for Sales, Purchases, Customers, Suppliers, Items, Stock, Payments, Receipts, Cheques, POs, Reports and Settings. |
 | **Sales** | Invoice number, date, customer, salesperson, agent and stock location. Item grid with HSN, qty, rate, discount %, GST and amount, and available stock per row. Subtotal, discount, CGST/SGST or IGST (chosen from the party's state), round off and grand total. Payment by cash, card, UPI, bank or credit (with advance). Save, Save & Print, Hold (resume later), Clear and Cancel. Unsaved drafts are restored. Invoice view and print, and invoice cancellation with a reason. **Saving reduces stock.** |
-| **Purchases** | Purchase number, supplier, date, supplier invoice number, payment terms, location, items and GST. **Saving increases stock** and updates the weighted-average cost. Goods can be received against a purchase order. |
+| **Purchases** | Purchase number, supplier, date, supplier invoice number, payment terms, location, items and GST. **Saving increases stock** and updates the weighted-average cost. Goods can be received against a purchase order. A purchase can be cancelled with a reason if nothing was returned against it and its stock is still on hand; this removes the stock and reopens the PO. |
 | **Sales / Purchase Return** | Pick the original bill and see the items sold or bought, what was already returned and what is still returnable. Enter return qty, reason and refund. A sales return adds stock; a purchase return removes it. The party account is adjusted by the return value less the refund. |
 | **Stock** | Code, name, category, HSN, unit, opening, purchased, sold, purchase return, sales return, transferred, adjusted, current, reorder, cost, selling price, value and status (In / Low / Out). Filters by search, category, status and location. Per-location detail. |
 | **Stock Entry** | Increase or decrease stock with item, location, qty, unit, date, reason and reference. Every change is kept in the movement history. |
@@ -37,7 +37,7 @@ Every button does something real. Stock, balances, GST and reports are all calcu
 | **Day Book** | Every voucher in date order with debit, credit and running balance. Filters: date range, type, party, payment mode and search. Reset, totals, Excel, CSV and print. |
 | **Party-Wise Report** | Customer or supplier statement over a date range: opening, sales/purchases, returns, receipts/payments, adjustments, closing. Rows open the source document. Also lists the party's open bills. |
 | **Masters** | Items (with a category manager), customers, suppliers and agents. GSTIN format is checked, and the state is filled in from the GSTIN. |
-| **Reports (18)** | Purchase Summary / Details, Sales Summary / Details, GSTR1, GSTR2, GSTR Summary, Item-Wise Profit, Bill-Wise Profit, HSN-Wise, Receivable and Payable (with aging buckets), Due Amount, Agent-Wise (commission), Purchase Order, Item-Wise Sales, Item-Wise Transaction, Items Loading List (Pending / Loaded / Completed). Each report has filters, date presets, instant search, summary cards, sortable columns and totals, plus **Excel (.xlsx), CSV, print preview and print**. Exports use the current filters and search. |
+| **Reports (18)** | Purchase Summary / Details, Sales Summary / Details, GSTR1, GSTR2, GSTR Summary, Item-Wise Profit, Bill-Wise Profit, HSN-Wise, Receivable and Payable (with aging buckets), Due Amount, Agent-Wise (commission), Purchase Order, Item-Wise Sales, Item-Wise Transaction, Items Loading List (Pending / Loaded / Completed). Each report has filters, date presets, instant search, summary cards, sortable columns and totals, plus **Excel (.xlsx), CSV, print preview and print**. Exports use the current filters and search. GSTR1 can also download a **GSTR-1 JSON** file for one month, in the GST offline-tool sections (b2b, b2cl, b2cs, cdnr, hsn). |
 | **Utilities** | Calculator (F9): + − × ÷, %, decimals, sign, keyboard input. Clean Temp Data: clears search history, remembered filters, drafts and held bills, or resets demo data (with confirmation). Close Window: closes the open dialog or goes back. Live date and time in the top bar. |
 | **Settings** | Business profile and invoice prefix. GST rates with the CGST/SGST/IGST split. Invoice numbering, decimals, round off and credit days. Inventory settings: negative stock, reorder level, locations. Users with roles and permissions (menus, screens and cost/profit visibility follow the signed-in user). Backup and restore. |
 
@@ -79,6 +79,7 @@ js/store.js           data model, persistence, business rules, GST maths, stock 
                       party ledgers, bill-wise allocation, day book, validation
 js/seed.js            demo data, replayed through the store so everything is consistent
 js/ui.js              components: data table, modal, confirm, combobox, toast, export buttons
+js/gst.js             state codes and the GSTR-1 JSON builder
 js/export.js          XLSX writer (Office Open XML, no library), CSV, print layouts
 js/charts.js          SVG line chart with tooltip, ranked bar list
 js/calc.js            calculator (no eval)
@@ -97,7 +98,7 @@ With a static server on port 5090 and Playwright available:
 ```bash
 node tests/crawl.cjs http://127.0.0.1:5090/          # every route: console errors, error panels, overflow (MOBILE=1 for phone width)
 node tests/data.cjs  http://127.0.0.1:5090/          # seed counts, stock / ledger / GST consistency
-node tests/e2e.cjs   http://127.0.0.1:5090/          # the 20 acceptance workflows + validation (55 checks)
+node tests/e2e.cjs   http://127.0.0.1:5090/          # the 20 acceptance workflows + validation (57 checks)
 ```
 
 ## Assumptions
@@ -116,6 +117,6 @@ node tests/e2e.cjs   http://127.0.0.1:5090/          # the 20 acceptance workflo
 ## Limitations
 
 - Single browser, single user at a time. Data is stored in this browser's localStorage (use Backup to move it). There is no server, login or passwords, and users exist only to demonstrate permissions.
-- The GST reports are prototype summaries. No JSON is generated for the GST portal, and there is no e-invoice or e-way bill.
-- Saved invoices and purchases cannot be edited (cancel or return instead). Purchases cannot be cancelled in this version.
+- The GSTR-1 JSON is generated locally for you to check and upload yourself. Nothing is sent to the GST portal, and there is no e-invoice or e-way bill.
+- Saved invoices and purchases cannot be edited: cancel them (with a reason) or record a return instead.
 - Printing uses the browser's print dialog (A4).

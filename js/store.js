@@ -346,6 +346,28 @@ export function savePurchase(doc) {
   return rec;
 }
 
+/** Cancel a purchase: stock goes back out, the bill (and any cash/bank paid on it) drops out of balances. */
+export function cancelPurchase(id, reason) {
+  const p = state.purchases.find(x => x.id === id);
+  const e = [];
+  if (!p || p.status === 'cancelled') e.push('Only saved purchases can be cancelled.');
+  else {
+    if (state.purchaseReturns.some(r => r.purchaseId === id)) e.push('This purchase has returns; it cannot be cancelled.');
+    if (!reason?.trim()) e.push('Give a reason for cancelling.');
+    const needs = {};
+    p.lines.forEach(l => { needs[l.itemId] = (needs[l.itemId] || 0) + l.qty; });
+    if (!e.length) checkStock(e, needs, p.location, 'Removing');
+  }
+  if (e.length) throw new ValidationError(e);
+  p.status = 'cancelled'; p.cancelReason = reason.trim();
+  const po = p.poId && state.pos.find(x => x.id === p.poId);
+  if (po) {
+    p.lines.forEach(l => { const pl = po.lines.find(x => x.itemId === l.itemId); if (pl) pl.received = round2(Math.max(0, (pl.received || 0) - l.qty)); });
+    po.status = po.lines.some(x => (x.received || 0) > 0) ? 'Partially Received' : 'Ordered';
+  }
+  commit();
+}
+
 // ------------------------------------------------------------------ returns
 export function returnedQty(kind, srcId, idx, exceptId) {
   const list = kind === 'sale' ? state.salesReturns.filter(r => r.saleId === srcId) : state.purchaseReturns.filter(r => r.purchaseId === srcId);

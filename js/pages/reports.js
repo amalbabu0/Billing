@@ -2,10 +2,12 @@
 // summary, table, Excel/CSV/print) driven by the report definitions below.
 import * as st from '../store.js';
 import { h, money, amt, qty, pct, today, fdate, matches, monthStart, inRange, sum, round2, addDays, daysBetween, fill } from '../utils.js';
-import { icon, dataTable, searchBox, select, dateInput, combo, exportButtons, kpi, statusBadge, badge, attempt, fmt } from '../ui.js';
+import { icon, dataTable, searchBox, select, dateInput, combo, exportButtons, kpi, statusBadge, badge, attempt, fmt, toast } from '../ui.js';
 import { navigate, query, setHooks } from '../router.js';
 import { modeLabel, paidStatus } from './billing.js';
 import { refPath } from './accounts.js';
+import { gstr1Json } from '../gst.js';
+import { download } from '../export.js';
 
 const MODES = [['', 'All payment modes'], ['cash', 'Cash'], ['card', 'Card'], ['upi', 'UPI'], ['bank', 'Bank'], ['credit', 'Credit']];
 const pname = id => st.party(id)?.name || '';
@@ -101,7 +103,13 @@ export const REPORTS = [
           { key: 'taxable', label: 'Taxable Value', type: 'money', total: true }, { key: 'cgst', label: 'CGST', type: 'money', total: true }, { key: 'sgst', label: 'SGST', type: 'money', total: true }, { key: 'igst', label: 'IGST', type: 'money', total: true }, { key: 'total', label: 'Total', type: 'money', total: true }],
         rows: out, open: r => navigate(r.kind === 'CDN' ? '/sales-return?view=' + r.doc.id : '/sales/' + r.doc.id),
         summary: [['Invoices', new Set(out.filter(r => r.kind === 'INV').map(r => r.doc.id)).size], ['Credit notes', new Set(out.filter(r => r.kind === 'CDN').map(r => r.doc.id)).size], ['Taxable value', money(sum(out, r => r.taxable))], ['Total tax', money(sum(out, r => r.cgst + r.sgst + r.igst))]],
-        note: 'B2B = customer has GSTIN; B2CL = unregistered inter-state invoice above ₹2.5 lakh; B2CS = other unregistered sales; CDN = credit notes from sales returns (negative).',
+        note: 'B2B = customer has GSTIN; B2CL = unregistered inter-state invoice above ₹2.5 lakh; B2CS = other unregistered sales; CDN = credit notes from sales returns (negative). The JSON file follows the GST offline-tool sections (b2b, b2cl, b2cs, cdnr, hsn) for one month; check it before uploading on the portal.',
+        actions: [['Download GSTR-1 JSON', () => {
+          const r = attempt(() => gstr1Json(f.from, f.to));
+          if (!r) return;
+          download(new Blob([JSON.stringify(r.json, null, 2)], { type: 'application/json' }), `GSTR1_${st.S().business.gstin}_${r.json.fp}.json`);
+          toast('GSTR-1 JSON downloaded', r.warnings.length ? 'bad' : 'ok', r.warnings.length ? r.warnings.join('; ') : `Period ${r.label}`);
+        }]],
       };
     },
   },

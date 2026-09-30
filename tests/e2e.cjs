@@ -173,6 +173,22 @@ const ok = (cond, msg) => { results.push((cond ? 'PASS ' : 'FAIL ') + msg); if (
   await page.locator('main input[type=number]').first().fill('2'); await page.getByRole('button', { name: 'Save adjustment' }).click(); await toast(/decreased/);
   ok(await S(async () => { const st = await import('./js/store.js'); return st.stockOf(st.getState().items.find(i => i.code === 'TEST-01').id); }) === 30, 'stock entry decreased stock to 30');
 
+  // Cancel the purchase that received the PO: stock goes back out and the PO reopens
+  const poPur = await S(async () => { const st = await import('./js/store.js'); return st.getState().purchases.slice(-1)[0].id; });
+  await go('/purchases/' + poPur); await page.getByRole('button', { name: 'Cancel purchase' }).click();
+  await page.locator('.modal textarea').fill('Entered twice'); await page.locator('.modal').getByRole('button', { name: 'Cancel purchase' }).click(); await toast(/Purchase cancelled/);
+  const pc = await S(async () => { const st = await import('./js/store.js'); return [st.stockOf(st.getState().items.find(i => i.code === 'TEST-01').id), st.getState().pos.slice(-1)[0].status]; });
+  ok(pc[0] === 15 && pc[1] === 'Ordered', `purchase cancel removed stock and reopened PO (${pc})`);
+
+  // GSTR-1 JSON
+  await go('/reports/gstr1'); await page.locator('select[aria-label="Date preset"]').selectOption({ label: 'This month' });
+  const [dj] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download GSTR-1 JSON' }).click()]);
+  const jp = xp.replace('.xlsx', '.json'); await dj.saveAs(jp);
+  const gj = JSON.parse(fs.readFileSync(jp, 'utf8'));
+  const hsnTx = gj.hsn.data.reduce((a, x) => a + x.txval, 0);
+  const secTx = (gj.b2b || []).flatMap(x => x.inv).flatMap(i => i.itms).reduce((a, x) => a + x.itm_det.txval, 0) + (gj.b2cl || []).flatMap(x => x.inv).flatMap(i => i.itms).reduce((a, x) => a + x.itm_det.txval, 0) + (gj.b2cs || []).reduce((a, x) => a + x.txval, 0) - (gj.cdnr || []).flatMap(x => x.nt).flatMap(n => n.itms).reduce((a, x) => a + x.itm_det.txval, 0);
+  ok(gj.fp.length === 6 && gj.hsn.data.length > 0 && Math.abs(hsnTx - secTx) < 1, `GSTR-1 JSON: sections reconcile with HSN (${hsnTx.toFixed(2)} vs ${secTx.toFixed(2)})`);
+
   // Cheque entry + status
   await go('/cheques'); await page.getByPlaceholder('6 digits').fill('445566'); await pick('Customer…', 'Test Customer');
   await page.getByPlaceholder('Bank & branch').fill('SBI Edappally'); await page.locator('main input[type=number]').first().fill('2000');

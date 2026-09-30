@@ -214,15 +214,16 @@ export function purchaseList() {
     { key: 'loc', label: 'Received at', value: r => st.location(r.location)?.name }, { key: 'mode', label: 'Mode', value: r => modeLabel(r.mode) },
     { key: 'taxable', label: 'Taxable', type: 'money', value: r => st.totals(r).taxable, total: true }, { key: 'tax', label: 'Tax', type: 'money', value: r => st.totals(r).tax, total: true },
     { key: 'grand', label: 'Total', type: 'money', value: r => st.totals(r).grand, total: true },
-    { key: 'pay', label: 'Payment', value: r => paidStatus(r), render: r => statusBadge(paidStatus(r)) },
+    { key: 'pay', label: 'Payment', value: r => (r.status === 'cancelled' ? 'Cancelled' : paidStatus(r)), render: r => statusBadge(r.status === 'cancelled' ? 'cancelled' : paidStatus(r)) },
   ];
   const table = dataTable({ columns: cols, onRowClick: r => navigate('/purchases/' + r.id) });
-  const refresh = () => table.setRows([...st.activePurchases()].filter(x => inRange(x.date, from, to) && matches(q, x.no, x.supplierInv, st.party(x.partyId)?.name, x.date)).reverse());
+  let status = 'saved';
+  const refresh = () => table.setRows([...st.getState().purchases].filter(x => (status === 'all' || (status === 'cancelled' ? x.status === 'cancelled' : x.status !== 'cancelled')) && inRange(x.date, from, to) && matches(q, x.no, x.supplierInv, st.party(x.partyId)?.name, x.date)).reverse());
   const ex = exportButtons(() => table.exportTable('Purchase Register', `${from ? fdate(from) : 'Start'} to ${fdate(to)}`));
   setHooks({ print: ex.print });
   const el = h('div', { class: 'page' },
     pageHeader('Purchases', [{ label: 'Purchases' }], [h('a', { class: 'btn', href: '#/po' }, icon('clipboard'), 'Purchase Orders'), h('a', { class: 'btn btn-primary', href: '#/purchases/new' }, icon('plus'), 'New Purchase')]),
-    h('div', { class: 'toolbar' }, h('label', { class: 'inline' }, 'From', dateInput({ value: from, onchange: e => { from = e.target.value; refresh(); } })), h('label', { class: 'inline' }, 'To', dateInput({ value: to, onchange: e => { to = e.target.value; refresh(); } })), searchBox({ placeholder: 'Purchase no., supplier invoice, supplier… ( / )', onInput: v => { q = v; refresh(); } }), h('div', { class: 'grow' }), ex.el),
+    h('div', { class: 'toolbar' }, h('label', { class: 'inline' }, 'From', dateInput({ value: from, onchange: e => { from = e.target.value; refresh(); } })), h('label', { class: 'inline' }, 'To', dateInput({ value: to, onchange: e => { to = e.target.value; refresh(); } })), select([['saved', 'Saved'], ['cancelled', 'Cancelled'], ['all', 'All']], 'saved', { 'aria-label': 'Status', onchange: e => { status = e.target.value; refresh(); } }), searchBox({ placeholder: 'Purchase no., supplier invoice, supplier… ( / )', onInput: v => { q = v; refresh(); } }), h('div', { class: 'grow' }), ex.el),
     table);
   refresh();
   return el;
@@ -263,12 +264,17 @@ export function docView(kind, { id }) {
     const reason = await confirmDialog({ title: `Cancel ${doc.no}?`, message: 'Stock will be added back and the bill removed from receivables and reports. The invoice number stays used.', okText: 'Cancel invoice', danger: true, reason: true });
     if (reason && attempt(() => st.cancelSale(doc.id, reason), 'Invoice cancelled')) navigate('/sales/' + doc.id + '?r=' + Date.now());
   };
+  const cancelPur = async () => {
+    const reason = await confirmDialog({ title: `Cancel ${doc.no}?`, message: 'The received stock is removed again and the bill drops out of payables and reports. Any purchase order it received is reopened.', okText: 'Cancel purchase', danger: true, reason: true });
+    if (reason && attempt(() => st.cancelPurchase(doc.id, reason), 'Purchase cancelled')) navigate('/purchases/' + doc.id + '?r=' + Date.now());
+  };
   const actions = [
     h('button', { class: 'btn', onclick: print }, icon('print'), 'Print'),
     kind === 'sale' && doc.status === 'saved' ? h('a', { class: 'btn', href: '#/sales-return?sale=' + doc.id }, icon('undo'), 'Sales Return') : null,
-    kind === 'purchase' ? h('a', { class: 'btn', href: '#/purchase-return?purchase=' + doc.id }, icon('redo'), 'Purchase Return') : null,
+    kind === 'purchase' && doc.status !== 'cancelled' ? h('a', { class: 'btn', href: '#/purchase-return?purchase=' + doc.id }, icon('redo'), 'Purchase Return') : null,
     bill && bill.balance > 0 && st.can('accounts') ? h('a', { class: 'btn', href: `#/cash?type=${kind === 'sale' ? 'receipt' : 'payment'}&party=${doc.partyId}&against=${doc.id}&amount=${bill.balance}` }, icon('cash'), kind === 'sale' ? 'Receive payment' : 'Pay supplier') : null,
     kind === 'sale' && doc.status === 'saved' && !returns.length ? h('button', { class: 'btn btn-danger-ghost', onclick: cancel }, icon('x'), 'Cancel invoice') : null,
+    kind === 'purchase' && doc.status !== 'cancelled' && !returns.length ? h('button', { class: 'btn btn-danger-ghost', onclick: cancelPur }, icon('x'), 'Cancel purchase') : null,
   ];
   return h('div', { class: 'page' },
     pageHeader(doc.no, [{ label: kind === 'sale' ? 'Sales' : 'Purchases', href: kind === 'sale' ? '#/sales' : '#/purchases' }, { label: doc.no }], actions),

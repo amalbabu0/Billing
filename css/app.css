@@ -258,7 +258,12 @@ button.chip { cursor: pointer; }
 .tbl tbody tr.grand td { font-weight: 700; background: var(--brand-soft); font-size: 13.5px; }
 .tbl tfoot td { position: sticky; bottom: 0; background: #e4e9f0; font-weight: 700; border-top: 1px solid var(--border-strong); padding: 6px 8px; white-space: nowrap; }
 .tbl .empty-row td { background: var(--surface) !important; }
-.truncate-cell { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.truncate-cell { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tbl .sticky-col { position: sticky; z-index: 1; background: var(--surface); }
+.tbl tbody tr:nth-child(even) td.sticky-col { background: #fafbfd; }
+.tbl th.sticky-col { z-index: 3; background: #e4e9f0; }
+.tbl tfoot td.sticky-col { z-index: 3; background: #e4e9f0; }
+.tbl tbody tr.clickable:hover td.sticky-col { background: var(--brand-soft); }
 .pager { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 8px; font-size: 12px; background: var(--surface-2); border: 1px solid var(--border); border-top: 0; border-radius: 0 0 var(--radius) var(--radius); }
 .pager-btns { display: flex; align-items: center; gap: 6px; }
 .status-sel { width: auto; font-weight: 600; }
