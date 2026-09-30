@@ -1,272 +1,121 @@
-# FurniShop — Furniture Shop Billing & Management
+# Reseller Solution — Retail / Wholesale ERP (prototype)
 
-Billing and shop management for Indian furniture retailers, available as a **browser app** (ASP.NET Core 8 API + React client, runs on any PC, tablet or phone) and a **Windows desktop app** (WPF), both on the same database and business services: GST billing / POS, quotations → sales orders → invoices, advances and part payments, customer credit, inventory with reservations, purchases and suppliers, custom-made orders, deliveries with proof, installations, expenses, reports, users and permissions. Data is stored in **PostgreSQL**, designed for **Neon** (serverless Postgres) so several counters or branches can share one database.
+A working browser prototype of a legacy desktop-style ERP ("RESELLER SOLUTION FOR WOOD PILLER") for a business that buys and sells physical products: billing, stock, cash and cheques, GST and 18 business reports.
 
----
+It is plain **HTML, CSS and JavaScript** (ES modules). There is no build step, framework or backend. All data lives in the browser (localStorage) and is seeded with realistic data for a Kerala-based wood pillar and timber reseller.
 
-## Contents
+## Run it
 
-1. [Quick start](#quick-start)
-   * [Web app](#web-app-browser)
-2. [Setting up Neon](#setting-up-neon)
-3. [Features](#features)
-   * [Operations extension](#operations-extension-web-app)
-4. [Keyboard shortcuts](#keyboard-shortcuts)
-5. [Architecture](#architecture)
-6. [Business rules and data integrity](#business-rules-and-data-integrity)
-7. [Security](#security)
-8. [Backups](#backups)
-9. [Command-line tool](#command-line-tool)
-10. [Development and tests](#development-and-tests)
-11. [Known limitations](#known-limitations)
-
----
-
-## Quick start
-
-**Requirements:** Windows 10/11, the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) (or just the .NET 8 Desktop Runtime to run a published build), and a PostgreSQL 14+ database — a free Neon project works.
-
-```powershell
-git clone <this repository>
-cd Billing
-dotnet run --project src/FurniShop.Wpf
-```
-
-Or publish a single folder to copy to shop PCs:
-
-```powershell
-dotnet publish src/FurniShop.Wpf -c Release -r win-x64 --self-contained false -o publish
-# run publish\FurniShop.exe
-```
-
-On first launch:
-
-1. **Connect to database** – paste your Neon connection string (either the `postgresql://…` URL from the Neon console or a `Host=…;Database=…` string) and press *Test & connect*. It is stored encrypted for the current Windows user.
-2. The database schema is created automatically (migrations run on every start and are safe to repeat).
-3. **Create the owner account** – shop name, state, GSTIN (optional) and an administrator login. Tick *Load demo data* to explore with sample data.
-4. Sign in.
-
-### Web app (browser)
-
-**Requirements:** .NET 8 SDK, Node.js 20+ (only to build the client), PostgreSQL 14+ / Neon.
+ES modules need to be served over http (opening `index.html` as a `file://` URL will not work):
 
 ```bash
-cd web && npm ci && npx vite build          # builds the React client into src/FurniShop.Web/wwwroot
-cd .. && export FURNISHOP_DB="postgresql://user:pass@host/db?sslmode=require"   # or ConnectionStrings:FurniShop in appsettings
-dotnet run --project src/FurniShop.Web      # open the URL printed at start-up
+python3 -m http.server 8000      # then open http://localhost:8000
+# or: npx serve .
 ```
 
-Migrations run at start-up. On an empty database the first screen creates the owner account (tick *Load demo data* to explore). For client development run the server with `ASPNETCORE_URLS=http://127.0.0.1:5080` and `npx vite` in `web/` (port 5173, proxies `/api` to 5080).
+It deploys to Vercel as a static site with no build command. Every push to the connected branch is deployed.
 
-Put the site behind HTTPS in production (a reverse proxy such as Caddy, nginx or IIS, or a platform like Azure App Service / Render). The browser never sees the database credentials — only the server holds them.
+The first visit seeds the demo data. To start over, use **Clean Temp Data → Reset ALL business data**, or **Settings → Data & Backup** to download or restore a JSON backup.
 
-### Demo data
+## What works
 
-The demo seed creates *Royal Oak Furniture Gallery, Bengaluru* with ~45 days of sales, products with variants, customers (including an inter-state GST customer for IGST), purchases, sales orders with advances, custom orders, deliveries, a return and an exchange.
+Every button does something real. Stock, balances, GST and reports are all calculated from the transactions you enter.
 
-| User | Role | Password |
-|---|---|---|
-| *(the admin you create)* | Admin | *(your choice)* |
-| `manager` | Manager | `Demo@1234` |
-| `sales1`, `sales2` | Sales | `Demo@1234` |
-| `delivery1` | Delivery | `Demo@1234` |
-| `accounts` | Accountant | `Demo@1234` |
-
-Change or disable demo users before real use (Employees → Users).
-
----
-
-## Setting up Neon
-
-1. Create a project at [neon.tech](https://neon.tech) — choose the **AWS Asia Pacific (Mumbai / Singapore)** region for lowest latency from India.
-2. In *Connection details*, pick the **pooled** connection (host contains `-pooler`) and copy the connection string.
-3. Paste it into FurniShop's connection screen. SSL is always required for Neon hosts.
-
-Every PC in the shop connects to the same database; each user signs in with their own login.
-
-Neon suspends idle compute; the first request after a pause can take a second or two while it wakes. The app retries the connection on start.
-
----
-
-## Features
-
-| Area | What it does |
+| Area | Features |
 |---|---|
-| **Dashboard** | Today / month sales, collections, outstanding, low-stock, pending deliveries, orders due; 30-day sales trend, sales by category, payment mix, top products; quick actions. |
-| **Sales (POS)** | Fast counter billing: barcode scan / product search / category browse, per-line and bill discounts (limited by role), inclusive or exclusive GST, CGST+SGST or IGST chosen automatically from the customer's state, delivery and installation charges, split payments (cash + UPI + card…), customer advance, credit sale with due date. Save as draft / print / PDF / WhatsApp. |
-| **Quotations → Sales orders → Invoices** | Convert with one click; references and prices are preserved. Sales orders take advances, reserve stock and track expected delivery. Converting applies the advances automatically. |
-| **Payments** | Receipts against an invoice, an order, or a customer account (oldest invoices first; excess held as advance). Refunds. Payments are never edited or deleted — a mistake is *voided* with a reason. |
-| **Returns & exchanges** | Return by line and condition (restock / damaged / scrap); credit to customer account or refund. Exchanges net the old items against new ones: e.g. return a ₹50,000 sofa for a ₹65,000 one and pay the ₹15,000 difference. |
-| **Customers** | Profile, addresses, GSTIN (checksum-validated), credit limit, full ledger (invoices, payments, returns, running balance), outstanding and ageing, WhatsApp reminders. |
-| **Products** | Categories, brands, variants (size / colour / finish / material) each with its own SKU, barcode, price and stock; HSN and GST rate; cost price visible only to permitted roles; barcode / QR labels. |
-| **Inventory** | On hand, reserved (for confirmed orders), available (= on hand − reserved), damaged, on display; stock in, adjustments with reasons, full movement history. Negative stock is blocked unless an admin enables it. |
-| **Purchases** | Purchase entry with GST adds stock and updates cost; supplier ledger, supplier payments, outstanding. |
-| **Custom orders** | Made-to-order furniture: specification, dimensions, material, photos / drawings, quoted price, advance, production stages (Measurement → Design approved → In production → Quality check → Ready → Delivered → Installed), then invoice. |
-| **Delivery** | Pending → Scheduled (date, slot, driver, vehicle) → Out for delivery → Delivered, with proof: signature pad, customer OTP, photo, remarks. Failed / rescheduled deliveries tracked. |
-| **Installation** | Scheduled installation jobs with technician, status and completion notes. |
-| **Expenses** | Rent, salaries, transport, etc. by category and payment method; included in profit reports. |
-| **Reports** | 27 reports: sales (by period / product / category / salesperson / customer), GST (GSTR-1 style B2B / B2C / HSN summary, tax liability), purchases, profit (gross and net of expenses), inventory valuation / low stock / movement / dead stock, payments / collections by method, outstanding & ageing, supplier dues… Filters, quick date presets, and export to Excel, CSV and PDF. |
-| **Employees** | Users, roles (Admin, Manager, Sales, Delivery, Accountant + custom), 49 granular permissions, activity log. |
-| **Settings** | Shop profile & logo, GST rates & HSN codes, invoice numbering (e.g. `INV-2026-0001`), terms, print formats, payment methods, printers (A4 / 80 mm / 58 mm thermal / labels), WhatsApp templates with live preview, security policy, backups. |
-| **Everywhere** | Global search (Ctrl+K) across products, customers, invoices and orders; notifications (low stock, overdue payments, deliveries today); print preview; A4 and thermal layouts; PDF; WhatsApp sharing; tables that switch to cards on narrow windows. |
+| **Dashboard** | Today's sales and purchases, cash and bank balance, receivable, payable, stock value, low stock, customer and supplier counts. Charts: 30-day sales vs purchases, top products, category sales. Recent sales, purchases, returns and payments. Quick actions. |
+| **Main Menu** | Tile menu for Sales, Purchases, Customers, Suppliers, Items, Stock, Payments, Receipts, Cheques, POs, Reports and Settings. |
+| **Sales** | Invoice number, date, customer, salesperson, agent and stock location. Item grid with HSN, qty, rate, discount %, GST and amount, and available stock per row. Subtotal, discount, CGST/SGST or IGST (chosen from the party's state), round off and grand total. Payment by cash, card, UPI, bank or credit (with advance). Save, Save & Print, Hold (resume later), Clear and Cancel. Unsaved drafts are restored. Invoice view and print, and invoice cancellation with a reason. **Saving reduces stock.** |
+| **Purchases** | Purchase number, supplier, date, supplier invoice number, payment terms, location, items and GST. **Saving increases stock** and updates the weighted-average cost. Goods can be received against a purchase order. |
+| **Sales / Purchase Return** | Pick the original bill and see the items sold or bought, what was already returned and what is still returnable. Enter return qty, reason and refund. A sales return adds stock; a purchase return removes it. The party account is adjusted by the return value less the refund. |
+| **Stock** | Code, name, category, HSN, unit, opening, purchased, sold, purchase return, sales return, transferred, adjusted, current, reorder, cost, selling price, value and status (In / Low / Out). Filters by search, category, status and location. Per-location detail. |
+| **Stock Entry** | Increase or decrease stock with item, location, qty, unit, date, reason and reference. Every change is kept in the movement history. |
+| **Stock Transfer** | From and to location, date, item, qty and notes. Stock leaves the source and arrives at the destination. Transfer history. |
+| **Cheque Entry** | Received or issued cheques with party, bank, amount and notes. Status: Pending → Cleared / Bounced / Cancelled, with history. Only cleared cheques change party and bank balances. |
+| **Cash Entry** | Cash receipts and payments with party, amount, description and reference, optionally against a specific bill. The cash balance updates immediately, and paying more cash than you have is blocked. |
+| **Purchase Orders** | Draft → Ordered → Partially Received → Received, or Cancelled. Edit, print, and receive goods (which creates a purchase). |
+| **Day Book** | Every voucher in date order with debit, credit and running balance. Filters: date range, type, party, payment mode and search. Reset, totals, Excel, CSV and print. |
+| **Party-Wise Report** | Customer or supplier statement over a date range: opening, sales/purchases, returns, receipts/payments, adjustments, closing. Rows open the source document. Also lists the party's open bills. |
+| **Masters** | Items (with a category manager), customers, suppliers and agents. GSTIN format is checked, and the state is filled in from the GSTIN. |
+| **Reports (18)** | Purchase Summary / Details, Sales Summary / Details, GSTR1, GSTR2, GSTR Summary, Item-Wise Profit, Bill-Wise Profit, HSN-Wise, Receivable and Payable (with aging buckets), Due Amount, Agent-Wise (commission), Purchase Order, Item-Wise Sales, Item-Wise Transaction, Items Loading List (Pending / Loaded / Completed). Each report has filters, date presets, instant search, summary cards, sortable columns and totals, plus **Excel (.xlsx), CSV, print preview and print**. Exports use the current filters and search. |
+| **Utilities** | Calculator (F9): + − × ÷, %, decimals, sign, keyboard input. Clean Temp Data: clears search history, remembered filters, drafts and held bills, or resets demo data (with confirmation). Close Window: closes the open dialog or goes back. Live date and time in the top bar. |
+| **Settings** | Business profile and invoice prefix. GST rates with the CGST/SGST/IGST split. Invoice numbering, decimals, round off and credit days. Inventory settings: negative stock, reorder level, locations. Users with roles and permissions (menus, screens and cost/profit visibility follow the signed-in user). Backup and restore. |
 
-### Operations extension (web app)
-
-These features are part of the web app and its API. The Windows desktop app shares the same database and business rules but does not have screens for them.
-
-| Area | What it does |
-|---|---|
-| **Locations** | Showroom, godowns and workshop, each with its own stock. Purchases can be received into any location; sales take stock from the default location first. The total across all locations always equals the product's stock. |
-| **Stock transfers** | Draft → Dispatched → In transit → Received (or Cancelled), with vehicle and notes. Stock leaves the source location on dispatch and reaches the destination on receipt. |
-| **Raw materials** | Wood, board, foam, fabric, hardware, polish and so on, with unit, reorder level and weighted-average cost. Receipts, issues, returns and adjustments are stored as movements that can't be changed. |
-| **Bill of materials** | Materials needed for one unit of a product, with wastage %. Shows material cost against the selling price (only to roles that may see cost). |
-| **Production** | Work orders for stock items or custom orders: New → Planning → Material ready → Cutting → Assembly → Finishing → QC → Ready → Completed, on a drag-and-drop board. Material needs come from the BOM. Work can't move past planning until materials are issued. Completing an order adds finished stock, or sets the custom order's production cost and moves it to quality check. |
-| **Warranty** | Warranties are created automatically when an invoice for a named customer is finalised, using each product's warranty months and terms. Cancelling the invoice voids them. Warranties can also be registered by hand. Expiry reminders. |
-| **Service desk** | Repair and complaint tickets linked to the warranty, invoice and customer, with technician, visit date and parts. Work under warranty is free. Chargeable work is billed through a normal GST invoice (SAC 998719) when the ticket is completed. |
-| **Leads & follow-ups** | Enquiry pipeline (New → Contacted → Quotation → Negotiation → Confirmed → Converted, or Lost) by source, budget and interest. A lead can be converted to a customer. Follow-ups can be attached to leads, customers, quotations, orders or invoices, and due and overdue ones appear on the dashboard. |
-| **Cash register** | Open the day with a float, then see cash sales, receipts, refunds, expenses and expected cash. Closing with a counted amount that differs from the expected amount needs a note and a manager's approval. |
-| **Credit limit** | A sale that goes over the customer's limit is blocked. A user with *Override credit limit* can allow it after entering a reason, and the override is recorded on the invoice and in the activity log. |
-| **Customer groups** | Retail, Wholesale, Dealer, Contractor, Designer, Corporate and VIP, each with a default discount that POS applies automatically, still capped by the product's discount limit. |
-| **Measured pricing** | A variant can be priced per sq ft, per running ft or per cubic ft (for custom wardrobes, glass, foam). At the counter you enter dimensions and the price is calculated. |
-| **Commission** | Sales, quotations and orders record the salesperson. Each user can have a commission %, and the *Salesperson commission* report pays it on net taxable sales after returns. |
-| **Product import & bulk edit** | Import products from CSV or Excel using the template. Every row is checked and shown as new, update or error before anything is saved. Imports never change the stock of existing products. You can select products and change price (by % or to a set amount), GST, category, discount, minimum stock, HSN or status in one step. |
-| **Barcode labels & serial numbers** | Price-tag labels with barcode or QR code print from *Products → Barcode labels*. A serial number is recorded on the product's warranty, written back to the invoice line, and carried into service tickets and search. |
-| **Advanced delivery** | Priority (low to urgent), route or area, and stop number on the route, alongside date, slot, driver and vehicle. Proof of delivery is an OTP, a signature and a photo. Installations are closed with the name of the person who accepted the work and a photo. |
-| **Order 360°** | One page per sale showing lead → quotation → order → advance → production → invoice → payment → delivery → installation → warranty → service. It has a stage tracker, every linked document and a combined timeline, and opens from any quotation, order, invoice or custom order. |
-| **Analytics** | Compare any period with the previous one or the same period last year: sales, invoices, collections, margin (for roles that may see cost), conversion, returns, new customers, plus categories, products, salespeople and payment methods. The *Inventory analytics* report classifies products as fast, slow, dead or overstocked. |
-| **Reminders** | A background job runs every hour (`Reminders:Enabled`, `Reminders:IntervalMinutes` in `appsettings.json`) and creates notifications for overdue invoices, due follow-ups, expiring warranties, service visits, low raw materials, and a cash register left open. It creates at most one notification per record per day. |
-| **WhatsApp templates** | Editable templates for quotation, invoice, receipt, payment reminder, order confirmation, production ready, delivery scheduled, delivery completed, warranty reminder and service update. Messages open in WhatsApp with the text filled in. See *Known limitations*. |
-| **Search, audit & permissions** | Global search also covers service tickets, warranties, leads, production orders and raw materials. The activity log can be filtered by action, module, user and date. The 14 new permissions are checked on the server; hiding buttons in the app is only a convenience. |
-
-**Not included:** AI insights and forecasting need an external model API, and none is configured, so the app does not claim to have them. If the connection drops, POS keeps the bill being typed on that device and shows an offline banner. Nothing is saved or numbered until the connection returns, so there is no offline invoicing.
-
----
-
-## Keyboard shortcuts
+### Keyboard
 
 | Key | Action |
 |---|---|
-| **F2** | New invoice (from anywhere) |
-| **Ctrl+K** | Global search |
-| **F4** | POS: jump to barcode / product search |
-| **F6** | POS: jump to customer search |
-| **F8** | POS: save draft |
-| **F9** | POS: save & print |
-| **F10** | POS: save & PDF |
-| **F11** | POS: save & WhatsApp |
-| **Alt+←** | Back |
-| **Esc** | Close dialog / search |
-| **Enter** / double-click | Open the selected row |
+| Ctrl+K | Global search: invoices, purchases, items, customers, suppliers, returns, POs, screens, dates |
+| / | Focus the page's search box |
+| Ctrl+S | Save the current form |
+| Ctrl+P | Print the current report or invoice (Save & Print on the sales form) |
+| F9 | Calculator |
+| Alt+W | Close window |
+| Esc | Close the dialog, clear a search box, or close a dropdown |
+| Enter / ↑ ↓ | Move through invoice cells, pick from lists, open table rows |
 
----
+## Routes
 
-## Architecture
+Hash routes:
+
+- **Transactions:**
+  - `#/` Dashboard, `#/menu` Main Menu
+  - `#/sales`, `#/sales/new`, `#/sales/:id`, `#/sales/edit/:id` (held bill)
+  - `#/purchases`, `#/purchases/new[?po=]`, `#/purchases/:id`
+  - `#/sales-return`, `#/purchase-return`
+- **Stock:** `#/stock`, `#/stock-entry`, `#/transfer`, `#/po`
+- **Accounts:** `#/cheques`, `#/cash`, `#/daybook`, `#/party-report`
+- **Masters:** `#/parties`, `#/items`
+- **Reports:** `#/reports`, `#/reports/:key`
+- **Settings:** `#/settings`
+
+## Code layout
 
 ```
-FurniShop.sln
-├─ src/FurniShop.Core            Domain models, GST calculator, money & Indian formatting, validators (GSTIN, mobile, PIN), permissions, settings, message templates. No I/O.
-├─ src/FurniShop.Infrastructure  PostgreSQL (Npgsql + Dapper), migrations, all business services, PDF/print layouts (PDFsharp), barcodes/QR (ZXing), Excel (ClosedXML), backup.
-├─ src/FurniShop.Web             ASP.NET Core 8 minimal API: cookie auth, per-request permission session, CSRF, rate limiting, problem+json errors; serves the built client.
-├─ web/                          React 19 + TypeScript + Vite client (TanStack Query, React Router). Design tokens in web/src/styles/tokens.css — see docs/DESIGN.md.
-├─ src/FurniShop.Wpf             WPF MVVM desktop app (CommunityToolkit.Mvvm). Views are data templates; printing via WPF FixedDocument.
-├─ tools/FurniShop.Cli           furnishop-cli: migrate, create admin, seed demo data, render sample PDFs.
-└─ tests/FurniShop.Tests         xUnit: unit tests + end-to-end workflow tests against a real PostgreSQL.
+index.html            shell page
+css/app.css           design tokens, layout, tables, forms, print and responsive rules
+js/utils.js           formatting (₹, Indian grouping, dates), DOM helper, PRNG
+js/store.js           data model, persistence, business rules, GST maths, stock ledger,
+                      party ledgers, bill-wise allocation, day book, validation
+js/seed.js            demo data, replayed through the store so everything is consistent
+js/ui.js              components: data table, modal, confirm, combobox, toast, export buttons
+js/export.js          XLSX writer (Office Open XML, no library), CSV, print layouts
+js/charts.js          SVG line chart with tooltip, ranked bar list
+js/calc.js            calculator (no eval)
+js/router.js          navigation helpers and page shortcuts
+js/app.js             shell, sidebar, routes, global search, keyboard shortcuts, utilities
+js/pages/*.js         dashboard, masters, billing, returns, stock, accounts, po, reports, settings
+tests/*.cjs           Playwright route crawl, data-consistency checks, end-to-end acceptance test
 ```
 
-* **One source of truth for tax.** `GstCalculator` (Core) computes every line and document total. The POS uses it for the live preview; the server-side service recomputes with the same code on save and never trusts totals from the screen.
-* **Services own the rules.** Every write goes through a service method which checks the signed-in user's permission, validates, and runs inside one database transaction (stock, numbering, payment and audit entry commit together or not at all).
-* **One path for stock.** `InventoryService.ApplyAsync` is the only code that changes stock; it writes an `inventory_movements` row for every change.
-* **Payments as allocations.** A payment has lines (how it was paid) and allocations (what it was applied to). Moving an advance from a sales order to its invoice is a pair of −/+ allocations, so history is never rewritten and every rupee is traceable.
-* **Documents.** Layouts draw to an abstract canvas rendered either to PDF (PDFsharp) or to WPF visuals for preview/printing, so the printout and the PDF are identical.
-* **Money** is `numeric(14,2)` in the database and `decimal` in code — never floating point. Amounts are shown in Indian grouping (₹1,23,456.00) and in words on invoices.
+All reads and writes go through `store.js`, so replacing `load`/`commit` with API calls is enough to connect a real backend later.
 
-### Database
+## Tests
 
-Migrations live in `src/FurniShop.Infrastructure/Database/Migrations` and are embedded in the assembly. They run under a PostgreSQL advisory lock, so two PCs starting at once are safe. Main tables: `products`, `product_variants`, `inventory`, `inventory_movements`, `customers`, `quotations`, `sales_orders`, `invoices` (+ `_items`), `payments`, `payment_lines`, `payment_allocations`, `sales_returns`, `exchanges`, `purchases`, `supplier_payments`, `custom_orders`, `deliveries`, `installations`, `expenses`, `users`, `roles`, `permissions`, `audit_logs`, `settings`, `document_sequences`, `attachments`; the operations extension (migrations 004–005) adds `warehouses`, `warehouse_stock`, `stock_transfers`, `raw_materials`, `raw_material_movements`, `boms`, `production_orders`, `warranties`, `service_tickets`, `leads`, `follow_ups`, `cash_sessions` and `customer_groups`.
-
----
-
-## Business rules and data integrity
-
-* Credit (unpaid or part-paid) sales require a named customer, not *Walk-in*.
-* Credit limit is checked when set; going over it needs *Override credit limit* and a recorded reason.
-* Stock by location always adds up to total stock; transfers move stock only on dispatch and receipt.
-* Raw-material movements are append-only; production cannot start cutting until materials are issued.
-* Stock cannot go negative unless an admin turns that on; *available* stock excludes reserved quantities.
-* Document numbers (`INV-2026-0001`, `QTN-…`, `SO-…`, `RCPT-…`) are assigned inside the saving transaction with a row lock: unique and without gaps even with several counters. Draft invoices get a number only when finalised. Year-based series restart each year; the invoice series cannot be set backwards.
-* Finalised invoices cannot be edited; they can be **cancelled** with a reason (stock returns, any money received is kept as customer advance). Cancelled invoices remain visible.
-* Payments, stock movements and the activity log cannot be updated or deleted — enforced by database triggers as well as by the services.
-* Records with history are soft-deleted (deactivated).
-* Discounts above a role's limit need a manager.
-* Cost price and profit are only shown to roles with *See cost price*.
-* Customer snapshot (name, address, GSTIN, state) is stored on each invoice so reprints never change.
-
----
-
-## Security
-
-* Passwords are hashed with PBKDF2-SHA256 (210,000 iterations, per-user salt). Accounts lock after repeated failed sign-ins (configurable). Forced password change on first sign-in for users created by an admin. Idle auto sign-out.
-* Every service method checks permissions for the signed-in user before reading or changing data; the UI hiding buttons is only a convenience.
-* **Web app.** Session cookie is HttpOnly, SameSite=Strict (Secure over HTTPS) and re-validated on each request against the user's current state (disabled, locked, password changed → signed out). Unsafe requests need a double-submit anti-forgery token (`X-XSRF-TOKEN`). Sign-in is limited to 10 attempts per 5 minutes per address, exports and reports to 40 per minute, and everything else by a token bucket. Strict Content-Security-Policy (`script-src 'self'`), `X-Content-Type-Options`, `Referrer-Policy` and same-origin-only framing are set. Cost and profit fields are removed on the server for roles without *See cost price*, not just hidden.
-* Desktop: the database connection string is encrypted with Windows DPAPI for the current user and never shown back.
-* All SQL is parameterised. CSV exports neutralise spreadsheet formula injection. Uploaded files are checked by content (JPEG / PNG / WEBP / PDF) and size (5 MB).
-* **Trust boundary (desktop app) — please read.** The web app keeps credentials on the server; the desktop app is two-tier: each PC connects directly to PostgreSQL with the database credentials. Permission checks run in the app, so anyone who extracts those credentials from a shop PC could bypass them and use the database directly. The database triggers still protect payments, stock history and the audit log from edits and deletes, but for stronger isolation:
-  * use a dedicated Neon role for the app (not the project owner) and keep the owner credentials off shop PCs;
-  * use Windows accounts with passwords on shop PCs and turn on disk encryption (BitLocker);
-  * rotate the Neon password if a PC is lost (Neon console → Roles → Reset password), then reconnect each PC via *Settings → Security → Connect to a different database*.
-  A future version could move the services behind a small web API so PCs never hold database credentials; the service layer is already separated to make that straightforward.
-
----
-
-## Backups
-
-Three layers, all under *Settings → Backup*:
-
-1. **Neon point-in-time restore** – Neon keeps history of the database (the window depends on your plan). Use the Neon console to restore or branch to a moment before a mistake.
-2. **Full backup with `pg_dump`** – *Back up now* writes a `.backup` file (custom format) to the backup folder; *Restore* replaces the database from one. Requires the PostgreSQL client tools on the PC (install *Command Line Tools* only from the PostgreSQL installer; version ≥ the Neon server version) — set the path in settings if they are not on `PATH`. Keep the backup folder inside OneDrive / Google Drive for an off-site copy.
-3. **Export all data** – a ZIP of JSON files, one per table, for your accountant or migration. No extra software needed. Password hashes are not exported.
-
-The dashboard reminds the admin when the last backup is older than the configured number of days.
-
----
-
-## Command-line tool
+With a static server on port 5090 and Playwright available:
 
 ```bash
-dotnet run --project tools/FurniShop.Cli -- migrate      --db "<connection string>"
-dotnet run --project tools/FurniShop.Cli -- create-admin --db "..." --user admin --name "Owner" --password "..."
-dotnet run --project tools/FurniShop.Cli -- seed-demo    --db "..." --user admin --password "..."
-dotnet run --project tools/FurniShop.Cli -- seed-extras  --db "..." --user admin --password "..."   # demo data for the operations extension
-dotnet run --project tools/FurniShop.Cli -- sample-pdfs  --db "..." --user admin --password "..." --out ./samples
+node tests/crawl.cjs http://127.0.0.1:5090/          # every route: console errors, error panels, overflow (MOBILE=1 for phone width)
+node tests/data.cjs  http://127.0.0.1:5090/          # seed counts, stock / ledger / GST consistency
+node tests/e2e.cjs   http://127.0.0.1:5090/          # the 20 acceptance workflows + validation (55 checks)
 ```
 
-The connection string may instead be given in the `FURNISHOP_DB` environment variable. The CLI runs on Windows, Linux and macOS.
+## Assumptions
 
----
+- **Tax and pricing.**
+  - Prices are exclusive of GST.
+  - Discount is a percentage per line.
+  - Bill totals are rounded to the rupee (configurable).
+  - Parties in the business's state (Kerala) pay CGST + SGST; everyone else pays IGST.
+- **Returns.** A return is valued proportionally to the original line, tax included. A refund is paid now; the rest is adjusted against the account.
+- **Outstanding bills.** Money received on a bill settles that bill first. Other receipts and payments settle the oldest bills first. Receivable and payable aging uses due dates (bill date + credit days).
+- **Profit.** Profit uses the item's weighted-average cost at the time of sale. Sales amounts in the profit reports exclude GST.
+- **Day Book.** Debit is value coming in (sales, receipts, purchase returns) and Credit is value going out.
+- **Items Loading List.** Built from the lines of saved sales.
 
-## Development and tests
+## Limitations
 
-```bash
-dotnet build FurniShop.sln
-dotnet test tests/FurniShop.Tests
-```
-
-Workflow tests need a PostgreSQL server; each test class creates and drops its own temporary database. Point them at a server with:
-
-```bash
-export FURNISHOP_TEST_DB="Host=127.0.0.1;Port=5432;Username=postgres;Password=...;Database=postgres"
-```
-
-Without a server they are skipped (unit tests still run). The 57 tests cover GST maths (intra/inter-state, inclusive/exclusive, rounding), validators, cash / credit / split-payment sales, quotation → order → invoice with advances, reservations, negative-stock rules, returns and refunds, exchanges, invoice cancellation, immutability of payments, concurrent invoice numbering, purchases and supplier ledger, custom order to installation, delivery proof, permissions and lockout, consistency between reports, PDFs and exports on the demo data set, GST listings / HSN / rate summaries / debit notes reconciling with invoices, locations and transfers, raw materials / BOM / production, warranties and chargeable service, leads and follow-ups, the cash register, credit-limit override, group and measured pricing, product import, Order 360°, and the web API pipeline (CSRF, sign-in, every GET endpoint, cost hiding for sales staff, forced password change, disabled users, rate limiting).
-
-The WPF project builds on any OS with the .NET 8 SDK (`EnableWindowsTargeting`), but only runs on Windows.
-
----
-
-## Known limitations
-
-* WhatsApp sharing opens WhatsApp (desktop or web) with the message pre-filled; the user presses Send and attaches the saved PDF. Fully automatic sending needs the WhatsApp Business API, which requires a Meta business account — not included.
-* E-invoicing (IRN / QR from the GST portal) and e-way bills are not integrated; GST reports are prepared for filing but not uploaded.
-* The application needs an internet connection to Neon; there is no offline mode.
-* Web app: delivery proof photos and signatures are captured in the browser; test the signature pad on the tablets you will use.
-* Built and tested on Linux (business logic, database, PDFs, and a full WPF compile); the desktop UI itself should be checked on Windows before rollout — screen layouts, printing to your specific printers, and the signature pad on touch screens.
+- Single browser, single user at a time. Data is stored in this browser's localStorage (use Backup to move it). There is no server, login or passwords, and users exist only to demonstrate permissions.
+- The GST reports are prototype summaries. No JSON is generated for the GST portal, and there is no e-invoice or e-way bill.
+- Saved invoices and purchases cannot be edited (cancel or return instead). Purchases cannot be cancelled in this version.
+- Printing uses the browser's print dialog (A4).

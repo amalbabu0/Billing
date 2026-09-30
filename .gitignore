@@ -1,10 +1,4 @@
-bin/
-obj/
-.vs/
-*.user
-*.suo
-TestResults/
-publish/
-appsettings.local.json
-web/node_modules/
-src/FurniShop.Web/wwwroot/
+node_modules/
+.DS_Store
+*.log
+.vercel
