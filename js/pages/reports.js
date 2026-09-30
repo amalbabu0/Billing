@@ -416,7 +416,7 @@ export function reportsPage({ key } = {}) {
   const refresh = () => {
     built = rep.build(f, refresh);
     const cols = built.sortable === false ? built.columns.map(c => ({ ...c, sortable: false })) : built.columns;
-    table = dataTable({ columns: cols, onRowClick: built.open || null, rowClass: built.rowClass, empty: built.empty || 'No records for these filters', pageSize: 100, maxHeight: 'calc(100vh - 330px)' });
+    table = dataTable({ columns: cols, onRowClick: built.open || null, rowClass: built.rowClass, empty: built.empty || 'No records for these filters', pageSize: 100, maxHeight: 'calc(100vh - 330px)', numbered: true });
     fill(tableHost, table);
     fill(summaryEl, ...(built.summary || []).map(([l, v, tone]) => kpi(l, String(v), null, tone)));
     noteEl.textContent = built.note || '';

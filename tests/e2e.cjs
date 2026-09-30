@@ -162,7 +162,7 @@ const ok = (cond, msg) => { results.push((cond ? 'PASS ' : 'FAIL ') + msg); if (
 
   // 20 item transaction history
   await go('/reports/item-transaction?item=' + itemId);
-  const types = await page.locator('main tbody td:nth-child(2)').allInnerTexts();
+  const types = await page.locator('main tbody td:nth-child(3)').allInnerTexts();
   ok(['Purchase', 'Sale', 'Sales Return', 'Transfer Out', 'Transfer In'].every(t => types.includes(t)), '20 item history: ' + types.join(', '));
   const lastBal = (await page.locator('main tfoot td').last().innerText()).trim();
   ok(lastBal === '32', `20 closing balance 32 (got ${lastBal})`);

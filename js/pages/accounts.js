@@ -27,7 +27,7 @@ export function dayBookPage() {
     { key: 'dr', label: 'Debit', type: 'money', total: true }, { key: 'cr', label: 'Credit', type: 'money', total: true },
     { key: 'balance', label: 'Balance', type: 'money', total: rows => rows.length ? rows[rows.length - 1].balance : 0 },
   ];
-  const table = dataTable({ columns: cols, onRowClick: r => navigate(refPath(r.kind, r.refId)), keyOf: r => r.no + r.type });
+  const table = dataTable({ columns: cols, onRowClick: r => navigate(refPath(r.kind, r.refId)), keyOf: r => r.no + r.type, numbered: true });
   const summary = h('div', { class: 'kpi-grid kpi-sm' });
   const refresh = () => {
     st.temp.set('daybookFilters', f);

@@ -57,6 +57,7 @@ const NAV = [
 ];
 
 let history = [];
+let tick = () => {};
 function match(path) {
   for (const r of ROUTES) {
     const a = r.path.split('/'), b = path.split('/');
@@ -108,15 +109,20 @@ function renderNav(path) {
   fill(nav, 
     h('div', { class: 'nav-section' }, 'Main'),
     NAV.filter(([, , , perm]) => !perm || st.can(perm)).map(([label, p, ic]) => [
-      h('a', { href: '#' + p, class: 'nav-link' + (active(p) ? ' active' : ''), 'aria-current': active(p) ? 'page' : null }, icon(ic), h('span', null, label),
-        p === '/reports' ? h('span', { class: 'nav-toggle' + (reportsOpen ? ' open' : ''), role: 'button', tabindex: '0', 'aria-label': reportsOpen ? 'Collapse report list' : 'Expand report list', 'aria-expanded': String(reportsOpen), onclick: e => { e.preventDefault(); e.stopPropagation(); st.temp.set('navReportsOpen', !reportsOpen); renderNav(path); }, onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click(); } }, icon('chevron')) : null),
+      p === '/reports'
+        ? h('div', { class: 'nav-row' },
+          h('a', { href: '#' + p, class: 'nav-link' + (active(p) ? ' active' : ''), 'aria-current': active(p) ? 'page' : null }, icon(ic), h('span', null, label)),
+          h('button', { class: 'nav-toggle' + (reportsOpen ? ' open' : ''), 'aria-label': reportsOpen ? 'Collapse report list' : 'Expand report list', 'aria-expanded': String(reportsOpen), onclick: () => { st.temp.set('navReportsOpen', !reportsOpen); renderNav(path); } }, icon('chevron')))
+        : h('a', { href: '#' + p, class: 'nav-link' + (active(p) ? ' active' : ''), 'aria-current': active(p) ? 'page' : null }, icon(ic), h('span', null, label)),
       p === '/reports' && reportsOpen ? h('div', { class: 'nav-sub' }, REPORTS.map(r => h('a', { href: '#/reports/' + r.key, class: 'nav-sublink' + (path === '/reports/' + r.key ? ' active' : '') }, r.title))) : null,
     ]),
     h('div', { class: 'nav-section' }, 'Utilities'),
     h('button', { class: 'nav-link', onclick: openCalculator }, icon('calc'), h('span', null, 'Calculator'), h('kbd', null, 'F9')),
     h('button', { class: 'nav-link', onclick: cleanTempData }, icon('broom'), h('span', null, 'Clean Temp Data')),
     h('button', { class: 'nav-link', onclick: closeWindow }, icon('x'), h('span', null, 'Close Window'), h('kbd', null, 'Alt+W')),
+    h('div', { class: 'side-clock', id: 'side-clock', 'aria-label': 'Current date and time' }),
   );
+  tick();
 }
 
 function shell() {
@@ -141,10 +147,14 @@ function shell() {
           h('button', { class: 'btn-icon', title: 'Close window (Alt+W)', 'aria-label': 'Close window', onclick: closeWindow }, icon('x')))),
       h('main', { id: 'main', tabindex: '-1' })),
   );
-  const tick = () => {
+  tick = () => {
     const d = new Date();
     const el = document.getElementById('clock-text');
-    if (el) el.textContent = `${fdate(today())}  ${d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+    const time = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).toUpperCase();
+    const day = d.toLocaleDateString('en-IN', { weekday: 'long' });
+    if (el) el.textContent = `${fdate(today())}  ${time}`;
+    const side = document.getElementById('side-clock');
+    if (side) fill(side, h('b', null, fdate(today()).replace(/\//g, '-')), h('span', null, time), h('span', null, day));
   };
   tick();
   setInterval(tick, 1000);

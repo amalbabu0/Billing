@@ -188,8 +188,11 @@ export function fmt(v, type) {
  * Returns an element with .setRows(rows) and .getView() (filtered+sorted rows).
  */
 const TRUNCATE = new Set(['desc', 'description', 'notes', 'reason', 'items']);
-export function dataTable({ columns, rows = [], onRowClick, pageSize = 50, empty = 'No records found', rowClass, compact = true, keyOf = r => r.id, maxHeight }) {
+export function dataTable({ columns, rows = [], onRowClick, pageSize = 50, empty = 'No records found', rowClass, compact = true, keyOf = r => r.id, maxHeight, numbered = false }) {
   let data = rows, sortKey = null, sortDir = 1, page = 1;
+  // Optional serial "No." column, numbered in the order currently shown (after filter and sort).
+  let rowNo = new Map();
+  if (numbered) columns = [{ key: '__no', label: 'No.', type: 'qty', sortable: false, value: r => rowNo.get(r), width: '46px' }, ...columns];
   const val = (c, r) => (c.value ? c.value(r) : r[c.key]);
   const isNum = c => ['money', 'qty', 'pct'].includes(c.type);
   const table = h('table', { class: `tbl${compact ? ' compact' : ''}` });
@@ -203,6 +206,7 @@ export function dataTable({ columns, rows = [], onRowClick, pageSize = 50, empty
   };
   const render = () => {
     const all = view();
+    if (numbered) rowNo = new Map(all.map((r, i) => [r, i + 1]));
     const pages = Math.max(1, Math.ceil(all.length / pageSize));
     page = Math.min(page, pages);
     const slice = all.slice((page - 1) * pageSize, page * pageSize);
@@ -260,6 +264,7 @@ export function dataTable({ columns, rows = [], onRowClick, pageSize = 50, empty
   /** Export-ready table (raw values) of the current filtered and sorted rows. */
   root.exportTable = (title, subtitle, summary) => {
     const all = view();
+    if (numbered) rowNo = new Map(all.map((r, i) => [r, i + 1]));
     const cols = columns.filter(c => c.export !== false);
     const hasTotals = cols.some(c => c.total);
     return {
