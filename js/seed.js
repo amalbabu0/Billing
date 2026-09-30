@@ -247,5 +247,19 @@ export function buildSeed() {
   });
   // One held bill to show the Hold feature.
   quiet(() => st.saveSale({ date: end, partyId: custs[4].id, agentId: '', mode: 'cash', location: 'L2', lines: [{ itemId: s.items[29].id, qty: 3, rate: s.items[29].price, disc: 0, gst: s.items[29].gst }], notes: 'Customer will confirm finish' }, { hold: true }));
+  // Give every record a realistic time of day on its own date (09:30–19:00), keeping entry order.
+  const recs = [...s.sales, ...s.purchases, ...s.salesReturns, ...s.purchaseReturns, ...s.adjustments, ...s.transfers, ...s.cheques, ...s.cash, ...s.pos].filter(x => x.date);
+  const byDate = {};
+  recs.forEach(x => (byDate[x.date] ||= []).push(x));
+  for (const [date, list] of Object.entries(byDate)) {
+    list.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    let base = new Date(date + 'T09:30:00').getTime();
+    let span = 9.5 * 3600000;
+    if (base + span > Date.now()) { // today: never later than now
+      if (Date.now() - base < list.length * 60000) base = Date.now() - Math.max(list.length * 60000, 3600000);
+      span = Date.now() - base;
+    }
+    list.forEach((x, i) => { x.createdAt = base + Math.round(((i + 0.2 + r.next() * 0.6) / list.length) * span); });
+  }
   return s;
 }

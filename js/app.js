@@ -1,7 +1,7 @@
 // Application shell: router, sidebar, top bar, clock, global search, keyboard shortcuts.
 import * as st from './store.js';
 import { buildSeed } from './seed.js';
-import { h, fdate, today, matches, money, setDecimals, fill } from './utils.js';
+import { h, fdate, today, matches, money, money0, setDecimals, fill, addDays } from './utils.js';
 import { icon, toast, modal, closeTopModal, modalOpen, confirmDialog } from './ui.js';
 import { openCalculator } from './calc.js';
 import { setHooks, getHooks, navigate, currentPath, flushMounted, clearMounted } from './router.js';
@@ -120,9 +120,26 @@ function renderNav(path) {
     h('button', { class: 'nav-link', onclick: openCalculator }, icon('calc'), h('span', null, 'Calculator'), h('kbd', null, 'F9')),
     h('button', { class: 'nav-link', onclick: cleanTempData }, icon('broom'), h('span', null, 'Clean Temp Data')),
     h('button', { class: 'nav-link', onclick: closeWindow }, icon('x'), h('span', null, 'Close Window'), h('kbd', null, 'Alt+W')),
+    pulse(),
     h('div', { class: 'side-clock', id: 'side-clock', 'aria-label': 'Current date and time' }),
   );
   tick();
+}
+
+/** Live business health for the sidebar: stock coverage and credit collection (last 90 days). */
+function pulse() {
+  const items = st.getState().items;
+  const inStock = items.filter(i => st.stockStatus(i) === 'in').length;
+  const since = addDays(today(), -89);
+  const billed = st.salesInRange(since, today()).reduce((a, x) => a + st.totals(x).grand, 0);
+  const due = st.outstanding('customer').rows.filter(r => r.date >= since).reduce((a, r) => a + r.balance, 0);
+  const collected = billed ? Math.max(0, Math.min(100, ((billed - due) / billed) * 100)) : 100;
+  const bar = pct => h('div', { class: 'pulse-bar', role: 'meter', 'aria-valuenow': Math.round(pct), 'aria-valuemin': 0, 'aria-valuemax': 100 }, h('i', { style: { width: pct.toFixed(1) + '%' } }));
+  return h('div', { class: 'side-pulse' },
+    h('div', { class: 'pulse-title' }, 'Business pulse'),
+    h('div', { class: 'pulse-row' }, h('div', { class: 'pulse-label' }, icon('box'), `Stock in hand (${items.length} items)`), bar(items.length ? (inStock / items.length) * 100 : 0), h('div', { class: 'pulse-sub' }, `${inStock} above reorder level · ${items.length - inStock} need attention`)),
+    h('div', { class: 'pulse-row' }, h('div', { class: 'pulse-label' }, icon('cash'), 'Credit collected (90 days)'), bar(collected), h('div', { class: 'pulse-sub' }, `${collected.toFixed(1)}% · ${money0(due)} still due`)),
+    h('a', { class: 'pulse-link', href: '#/reports/receivable' }, 'Receivable report ↗'));
 }
 
 function shell() {
@@ -133,6 +150,7 @@ function shell() {
   fill(app, 
     h('aside', { class: 'sidebar', id: 'sidebar' },
       h('a', { class: 'brand', href: '#/' }, h('div', { class: 'brand-mark' }, 'WP'), h('div', null, h('div', { class: 'brand-name' }, 'Reseller Solution'), h('div', { class: 'brand-sub' }, 'for ' + b.name))),
+      st.can('sales') ? h('a', { class: 'new-btn', href: '#/sales/new' }, icon('plus'), 'New Sale') : h('a', { class: 'new-btn', href: '#/menu' }, icon('grid'), 'Main Menu'),
       h('nav', { id: 'nav', 'aria-label': 'Main navigation' }),
       h('div', { class: 'side-foot' }, h('div', { class: 'user-chip' }, h('div', { class: 'avatar' }, user.name.slice(0, 1)), h('div', null, h('div', null, user.name), h('div', { class: 'muted' }, user.role))))),
     h('div', { class: 'nav-scrim', onclick: () => document.body.classList.remove('nav-open') }),

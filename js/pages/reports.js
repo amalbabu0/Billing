@@ -352,7 +352,7 @@ export function reportsPage({ key } = {}) {
     GROUPS.map(g => { const list = available.filter(r => r.group === g); return list.length ? [h('div', { class: 'report-group' }, g), list.map(r => h('a', { href: '#/reports/' + r.key, class: 'report-link' + (r.key === key ? ' active' : '') }, r.title))] : null; }));
   if (!rep) {
     return h('div', { class: 'page report-page' }, h('div', { class: 'report-layout' }, side,
-      h('div', { class: 'report-main' }, h('div', { class: 'page-head' }, h('div', null, h('nav', { class: 'crumbs' }, h('a', { href: '#/' }, 'Home'), h('span', { class: 'sep' }, '›'), h('span', null, 'Reports')), h('h1', null, 'Reports'))),
+      h('div', { class: 'report-main' }, h('div', { class: 'page-head' }, h('div', null, h('nav', { class: 'crumbs' }, h('a', { href: '#/' }, 'Home'), h('span', { class: 'sep' }, '›'), h('span', null, 'Reports')), h('h1', null, 'Reports', h('span', { class: 'title-badge', 'aria-hidden': 'true' }, icon('chart'))))),
         key ? h('div', { class: 'notice' }, icon('alert'), 'That report is not available for your role.') : null,
         h('div', { class: 'report-cards' }, GROUPS.map(g => { const list = available.filter(r => r.group === g); return list.length ? h('div', { class: 'card' }, h('div', { class: 'card-head' }, h('h3', null, g)), h('div', { class: 'card-body report-card-links' }, list.map(r => h('a', { href: '#/reports/' + r.key }, icon('chart'), r.title)))) : null; })))));
   }
@@ -390,7 +390,7 @@ export function reportsPage({ key } = {}) {
   const search = searchBox({ placeholder: 'Search in report… ( / )', onInput: v => { f.q = v; applySearch(); } });
   const summaryEl = h('div', { class: 'kpi-grid kpi-sm' });
   const noteEl = h('p', { class: 'muted small report-note' });
-  const actionsEl = h('div', { class: 'row' });
+  const actionsEl = h('div', { class: 'row', style: { flexWrap: 'wrap' } });
   const tableHost = h('div');
   let table = null, built = null;
   const subtitle = () => {
@@ -429,7 +429,7 @@ export function reportsPage({ key } = {}) {
   const reset = () => { st.temp.set('rf-' + rep.key, null); navigate('/reports/' + rep.key + '?reset=' + Date.now()); };
   return h('div', { class: 'page report-page' }, h('div', { class: 'report-layout' }, side,
     h('div', { class: 'report-main' },
-      h('div', { class: 'page-head' }, h('div', null, h('nav', { class: 'crumbs', 'aria-label': 'Breadcrumb' }, h('a', { href: '#/' }, 'Home'), h('span', { class: 'sep' }, '›'), h('a', { href: '#/reports' }, 'Reports'), h('span', { class: 'sep' }, '›'), h('span', null, rep.group)), h('h1', null, rep.title)), h('div', { class: 'page-actions' }, ex.el)),
+      h('div', { class: 'page-head' }, h('div', null, h('nav', { class: 'crumbs', 'aria-label': 'Breadcrumb' }, h('a', { href: '#/' }, 'Home'), h('span', { class: 'sep' }, '›'), h('a', { href: '#/reports' }, 'Reports'), h('span', { class: 'sep' }, '›'), h('span', null, rep.group)), h('h1', null, rep.title, h('span', { class: 'title-badge', 'aria-hidden': 'true' }, icon('chart')))), h('div', { class: 'page-actions' }, ex.el)),
       h('div', { class: 'toolbar wrap report-filters' }, ...filterEls, search, h('button', { class: 'btn btn-ghost', onclick: reset, title: 'Reset filters' }, 'Reset')),
       summaryEl, actionsEl, tableHost, noteEl)));
 }

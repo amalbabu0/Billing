@@ -7,7 +7,7 @@ const res = [];
 const ok = (c, m) => res.push((c ? 'PASS ' : 'FAIL ') + m);
 (async () => {
   const b = await chromium.launch();
-  const page = await (await b.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true })).newPage();
+  const page = await (await b.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true, ignoreHTTPSErrors: true })).newPage();
   const errs = []; page.on('pageerror', e => errs.push(e.message)); page.on('console', m => m.type() === 'error' && errs.push(m.text()));
   await page.goto(BASE); await page.evaluate(() => localStorage.clear()); await page.goto(BASE); await page.waitForSelector('.kpi');
   const nav = name => page.locator('#nav').getByRole('link', { name, exact: true }).click().then(() => page.waitForTimeout(250));
@@ -16,8 +16,8 @@ const ok = (c, m) => res.push((c ? 'PASS ' : 'FAIL ') + m);
 
   // ---- left menu (screenshot column 1)
   await nav('Main Menu'); ok(await h1() === 'Main Menu' && await page.locator('.menu-tile').count() >= 10, 'MAIN MENU opens with tiles');
-  await nav('Day Book'); ok(await h1() === 'Day Book' && await rows() > 0 && (await page.locator('main th').first().innerText()) === 'No.', `DAY BOOK lists vouchers with No. column (${await rows()})`);
-  await nav('Party-Wise Report'); { const i = page.getByPlaceholder('Choose customer or supplier…'); await i.click(); await i.fill('Sreenivas'); await page.waitForTimeout(100); await i.press('Enter'); await page.waitForTimeout(200); ok((await page.locator('main').innerText()).includes('Closing Balance') && await rows() > 0, 'PARTY-WISE REPORT shows a statement'); }
+  await nav('Day Book'); ok(await h1() === 'Day Book' && await rows() > 0 && (await page.locator('main th').first().textContent()).trim() === 'No.', `DAY BOOK lists vouchers with No. column (${await rows()})`);
+  await nav('Party-Wise Report'); { const i = page.getByPlaceholder('Choose customer or supplier…'); await i.click(); await i.fill('Sreenivas'); await page.waitForTimeout(100); await i.press('Enter'); await page.waitForTimeout(200); ok((await page.locator('main').textContent()).includes('Closing Balance') && await rows() > 0, 'PARTY-WISE REPORT shows a statement'); }
   await nav('Stock'); ok(await rows() >= 32, `STOCK lists items (${await rows()})`);
   await nav('Stock Entry'); { const i = page.getByPlaceholder('Item name or code…', { exact: true }); await i.click(); await i.fill('WP-TK-08'); await page.waitForTimeout(100); await i.press('Enter'); await page.locator('main input[type=number]').first().fill('1'); await page.getByRole('button', { name: 'Save adjustment' }).click(); ok(await page.locator('.toast', { hasText: 'increased' }).count() === 1, 'STOCK ENTRY saves an adjustment'); }
   await nav('Reports'); ok(await page.locator('.report-link').count() === 18, 'REPORT opens the report menu (18 reports)');
@@ -47,7 +47,7 @@ const ok = (c, m) => res.push((c ? 'PASS ' : 'FAIL ') + m);
     const preset = page.locator('select[aria-label="Date preset"]');
     if (await preset.count()) { await preset.selectOption({ label: 'All' }); await page.waitForTimeout(150); }
     const n = await rows();
-    const heads = await page.locator('main thead th').allInnerTexts();
+    const heads = (await page.locator('main thead th').allTextContents()).map(x => x.trim());
     // Search: take a value from the first data row and search for it
     const term = (await page.locator('main tbody tr').first().locator('td').nth(name === 'GSTR Summary' ? 1 : 2).innerText()).split('\n')[0].trim().split(' ')[0];
     await page.getByPlaceholder('Search in report… ( / )').fill(term); await page.waitForTimeout(250);

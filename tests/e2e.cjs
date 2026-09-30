@@ -7,7 +7,7 @@ const results = [];
 const ok = (cond, msg) => { results.push((cond ? 'PASS ' : 'FAIL ') + msg); if (!cond) console.log('FAIL', msg); };
 (async () => {
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true });
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true, ignoreHTTPSErrors: true });
   const page = await ctx.newPage();
   const errs = []; page.on('console', m => m.type() === 'error' && errs.push(m.text())); page.on('pageerror', e => errs.push('PAGEERROR ' + e.message));
   const go = async p => { await page.goto(BASE + '#' + p); await page.waitForTimeout(200); };
@@ -201,7 +201,7 @@ const ok = (cond, msg) => { results.push((cond ? 'PASS ' : 'FAIL ') + msg); if (
 
   // Day book, party report
   await go('/daybook'); ok(await page.locator('main tbody tr').count() > 5, 'day book lists vouchers');
-  await go('/party-report?party=' + custId); ok((await page.locator('main').innerText()).includes('Closing Balance'), 'party-wise report shows balances');
+  await go('/party-report?party=' + custId); ok((await page.locator('main').textContent()).includes('Closing Balance'), 'party-wise report shows balances');
 
   // Global search (Ctrl+K)
   await go('/'); await page.keyboard.press('Control+k'); await page.keyboard.type(sale.no); await page.waitForTimeout(150); await page.keyboard.press('Enter'); await page.waitForTimeout(250);

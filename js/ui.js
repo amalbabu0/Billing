@@ -45,6 +45,9 @@ const ICONS = {
   tag: 'M3 12V3h9l9 9-9 9zM7.5 7.5h0',
   pin: 'M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11zM12 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
   filter: 'M3 4h18l-7 8v6l-4 2v-8z',
+  rupee: 'M6 4h12M6 9h12M9 4c4 0 6 2 6 5s-2 5-6 5H6l8 7',
+  link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
+  more: 'M5 12h.01M12 12h.01M19 12h.01',
 };
 export function icon(name, cls = '') {
   const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -313,9 +316,11 @@ export function searchBox({ value = '', placeholder = 'Search…', onInput, auto
 export function kpi(label, value, sub, tone, onclick) {
   return h(onclick ? 'button' : 'div', { class: `kpi ${tone ? 'kpi-' + tone : ''}`, onclick }, h('div', { class: 'kpi-label' }, label), h('div', { class: 'kpi-value' }, value), sub ? h('div', { class: 'kpi-sub' }, sub) : null);
 }
-export function pageHeader(title, crumbs = [], actions = []) {
+const TITLE_ICONS = { Dashboard: 'rupee', 'Main Menu': 'grid', Sales: 'cart', 'New Sale': 'cart', Purchases: 'truck', 'New Purchase': 'truck', 'Day Book': 'book', Parties: 'users', 'Party-Wise Report': 'users', Items: 'tag', Stock: 'box', 'Stock Entry': 'edit', 'Sales Return': 'undo', 'Purchase Return': 'redo', 'Stock Transfer': 'swap', 'Cheque Entry': 'cheque', 'Cash Entry': 'cash', 'Purchase Orders': 'clipboard', Reports: 'chart', Settings: 'settings' };
+export function pageHeader(title, crumbs = [], actions = [], iconName) {
+  const ic = iconName || TITLE_ICONS[title] || (/^(INV|PUR)/.test(title) ? 'receipt' : 'file');
   return h('div', { class: 'page-head' },
-    h('div', null, h('nav', { class: 'crumbs', 'aria-label': 'Breadcrumb' }, h('a', { href: '#/' }, 'Home'), crumbs.map(c => [h('span', { class: 'sep' }, '›'), c.href ? h('a', { href: c.href }, c.label) : h('span', null, c.label)])), h('h1', null, title)),
+    h('div', null, h('nav', { class: 'crumbs', 'aria-label': 'Breadcrumb' }, h('a', { href: '#/' }, 'Home'), crumbs.map(c => [h('span', { class: 'sep' }, '›'), c.href ? h('a', { href: c.href }, c.label) : h('span', null, c.label)])), h('h1', null, title, h('span', { class: 'title-badge', 'aria-hidden': 'true' }, icon(ic)))),
     h('div', { class: 'page-actions' }, actions));
 }
 export const card = (title, body, actions) => h('section', { class: 'card' }, title ? h('div', { class: 'card-head' }, h('h3', null, title), actions ? h('div', { class: 'card-actions' }, actions) : null) : null, h('div', { class: 'card-body' }, body));

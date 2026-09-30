@@ -6,7 +6,7 @@ const ROUTES = ['/', '/menu', '/sales', '/sales/new', '/purchases', '/purchases/
   ...['purchase-summary', 'purchase-details', 'sales-summary', 'sales-details', 'gstr1', 'gstr2', 'gstr-summary', 'item-profit', 'bill-profit', 'hsn', 'receivable', 'payable', 'due-amount', 'agent', 'purchase-order', 'item-sales', 'item-transaction', 'loading-list'].map(k => '/reports/' + k)];
 (async () => {
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: process.env.MOBILE ? { width: 390, height: 844 } : { width: 1440, height: 900 } });
+  const ctx = await browser.newContext({ viewport: process.env.MOBILE ? { width: 390, height: 844 } : { width: 1440, height: 900 }, ignoreHTTPSErrors: true });
   const page = await ctx.newPage();
   const errs = [];
   page.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
